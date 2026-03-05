@@ -1359,7 +1359,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                 // 先清空原数据
                 seqList.Clear();
                 // 读取的开始行
-                var rowIndex = 2;
+                var rowIndex = 3;
                 try
                 {
                     /**
