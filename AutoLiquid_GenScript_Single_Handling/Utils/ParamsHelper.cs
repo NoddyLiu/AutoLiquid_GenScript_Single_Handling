@@ -223,7 +223,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
         {
             for (var i = 0; i < templateCount; i++)
             {
-                availableList.Add(false);
+                availableList.Add(true);
             }
         }
 

@@ -57,25 +57,46 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
         /// <param name="rowCount"></param>
         /// <param name="colCount"></param>
         /// <param name="a1Pos"></param>
+        /// <param name="indexHorizontal">index是否水平递增（默认垂直递增）</param>
         /// <returns></returns>
-        public static string GetHolePosStr(int holeIndex, int rowCount, int colCount, EA1Pos a1Pos)
+        public static string GetHolePosStr(int holeIndex, int rowCount, int colCount, EA1Pos a1Pos, bool indexHorizontal = false)
         {
             var result = "";
             if (a1Pos == EA1Pos.LeftTop)
             {
-                var rowIndex = holeIndex % rowCount;
-                var colIndex = holeIndex / rowCount;
-                result = ViewUtils.PosLetterList[rowIndex] + ViewUtils.PosNumList[colIndex];
+                if (!indexHorizontal)
+                {
+                    var rowIndex = holeIndex % rowCount;
+                    var colIndex = holeIndex / rowCount;
+                    result = ViewUtils.PosLetterList[rowIndex] + ViewUtils.PosNumList[colIndex];
+                }
+                else
+                {
+                    var colIndex = holeIndex % colCount;
+                    var rowIndex = holeIndex / colCount;
+                    result = ViewUtils.PosLetterList[rowIndex] + ViewUtils.PosNumList[colIndex];
+                }
             }
             else
             {
-                var rowIndex = holeIndex / colCount;
-                var colIndex = holeIndex % colCount;
-                result = ViewUtils.PosLetterList[colIndex] + ViewUtils.PosNumList[rowIndex];
+                if (!indexHorizontal)
+                {
+                    var rowIndex = holeIndex / colCount;
+                    var colIndex = holeIndex % colCount;
+                    result = ViewUtils.PosLetterList[colIndex] + ViewUtils.PosNumList[rowIndex];
+                }
+                else
+                {
+                    var colIndex = holeIndex / colCount;
+                    var rowIndex = holeIndex % colCount;
+                    result = ViewUtils.PosLetterList[colIndex] + ViewUtils.PosNumList[rowIndex];
+                }
             }
 
             return result;
         }
+
+
 
         /// <summary>
         /// 是否为384枪头盒（如果枪头盒x和y步长为4.5mm，且枪头盒总孔数为384，则认为是384枪头盒）

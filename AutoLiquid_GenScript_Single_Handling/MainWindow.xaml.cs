@@ -131,12 +131,6 @@ namespace AutoLiquid_GenScript_Single_Handling
 
             // 控件事件
             ControlEvent();
-
-            // 校准偏移值
-            Calibration();
-
-            // 外部设备串口控制
-            SerialPort();
         }
 
         private void OnClosing(object sender, CancelEventArgs e)
@@ -226,213 +220,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                 CmdHelper.Xs(0, 0);
             }
         }
-
-        /// <summary>
-        /// 校准偏移值
-        /// </summary>
-        private void Calibration()
-        {
-            /**
-             * 根据设备id获取相应的位置偏移值（校准）
-             */
-            var thread = new Thread(() =>
-            {
-                // 查询设备id
-                CmdHelper.QueryDeviceId();
-                Thread.Sleep(300);
-                var device = ParamsHelper.Offsets.Devices.FirstOrDefault(p => p.Id.Equals(CmdHelper.frmDAE.mDeviceId));
-                if (null != device)
-                {
-                    CmdHelper.offsetTemplate.X = device.OffsetTemplate.X;
-                    CmdHelper.offsetTemplate.Y = device.OffsetTemplate.Y;
-                    CmdHelper.offsetTemplate.Z = device.OffsetTemplate.Z;
-                }
-                // 获取不了设备id，默认用最后一组数据（即最新数据）
-                else
-                {
-                    var deviceNewest = ParamsHelper.Offsets.Devices.LastOrDefault();
-                    if (null != deviceNewest)
-                    {
-                        CmdHelper.offsetTemplate.X = deviceNewest.OffsetTemplate.X;
-                        CmdHelper.offsetTemplate.Y = deviceNewest.OffsetTemplate.Y;
-                        CmdHelper.offsetTemplate.Z = deviceNewest.OffsetTemplate.Z;
-                    }
-                }
-            });
-            thread.IsBackground = true;
-            thread.Start();
-        }
-
-
-        #region 串口通信
-        /// <summary>
-        /// 外部设备串口控制
-        /// </summary>
-        private void SerialPort()
-        {
-            if (ParamsHelper.IO.SerialPortAvailable)
-            {
-                try
-                {
-                    mSerialPort = new SerialPort(ParamsHelper.IO.SeialPort, 9600) { DtrEnable = true };
-                    mSerialPort.DataReceived += new SerialDataReceivedEventHandler(SerialPortOnDataReceived);
-                    mSerialPort.Open();
-                }
-                catch (Exception e)
-                {
-                    LogHelper.Error((string)this.FindResource("Prompt_Serial_Port_Error") + "：" + e.StackTrace);
-                }
-            }
-        }
-
-        private void SerialPortOnDataReceived(object sender, SerialDataReceivedEventArgs e)
-        {
-            var serialDevice = sender as SerialPort;
-            // 收取完整帧
-            while (serialDevice.BytesToRead != 8)
-            {
-                Thread.Sleep(10);
-            }
-            var byteCount = serialDevice.BytesToRead;
-            var bytes = new byte[byteCount];
-            serialDevice.Read(bytes, 0, byteCount);
-            // 打印串口接收数据
-            string hexString = String.Join(" ", bytes.Select(b => b.ToString("X2")));
-            LogHelper.Info((string)this.FindResource("Prompt_Serial_Data_Receiver"), hexString);
-            // 构建帧
-            BaseFrame baseFrame = new BaseFrame();
-            try
-            {
-                baseFrame.CopyFromBuffer(bytes);
-                // 判断校验码
-                if (DataHelper.CheckFrameCodeValidate(baseFrame))
-                {
-                    // 控制设备（启停程序）
-                    if (baseFrame.FrameData.CMDCode == Code.CMD_CONTROL && baseFrame.FrameData.ConcreteData[0] == Code.DEVICE_PROGRAM)
-                    {
-                        // 设备或程序编号（默认为1）
-                        var deviceProgramNo = baseFrame.FrameData.ConcreteData[2];
-
-                        // 通信失败
-                        // if (!CmdHelper.frmDAE.isCanNetSuccess)
-                        // {
-                        //     var validData = new ValidData(Code.CMD_CONTROL, new byte[] { Code.DEVICE_PROGRAM, Code.ERROR_COMM, deviceProgramNo });
-                        //     SerialPortSender(serialDevice, validData);
-                        // }
-                        // // 没有可执行的程序
-                        // else if (excelFilesNameList.Count < deviceProgramNo || deviceProgramNo == 0)
-                        // {
-                        //     var validData = new ValidData(Code.CMD_CONTROL, new byte[] { Code.DEVICE_PROGRAM, Code.ERROR_NO_PROGRAM, deviceProgramNo });
-                        //     SerialPortSender(serialDevice, validData);
-                        // }
-                        // else
-                        // {
-                        // 启动程序
-                        if (baseFrame.FrameData.ConcreteData[1] == 0x01)
-                        {
-                            if (!isRunning)
-                            {
-                                // 根据设备或程序编号判断需要导入运行哪个excel文件
-                                string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                                excelFilesNameImported = excelFilesNameList.ElementAt(deviceProgramNo - 1);
-                                var filePath = rootPath + @"\" + excelFilesNameImported;
-                                ParseDataFromExcel(filePath);
-
-                                bool checkBoxReplaceTipOverRange = false;
-                                Dispatcher.Invoke(() =>
-                                {
-                                    checkBoxReplaceTipOverRange = (bool)this.CheckBoxReplaceTipOverRange.IsChecked;
-                                });
-                                RunProcedure(checkBoxReplaceTipOverRange, false, new SerialPortCompletedCallBack(serialDevice, deviceProgramNo));
-                            }
-                        }
-                        // 停止程序
-                        else if (baseFrame.FrameData.ConcreteData[1] == 0x00)
-                        {
-                            if (isRunning)
-                            {
-                                // 模拟点击停止
-                                mMainWindow.Dispatcher.Invoke(() =>
-                                {
-                                    // 模拟手动点击“暂停”
-                                    SetLoadingStatus(ERunStatus.Pause, false);
-                                    Thread.Sleep(100);
-                                    // 模拟手动点击“停止”
-                                    SetLoadingStatus(ERunStatus.Stop, false);
-                                });
-                            }
-                            var validData = new ValidData(Code.CMD_CONTROL, new byte[] { Code.DEVICE_PROGRAM, 0x00, deviceProgramNo });
-                            SerialPortSender(serialDevice, validData);
-                        }
-                        // }
-                    }
-                    // 查询状态（移液工作站）
-                    else if (baseFrame.FrameData.CMDCode == Code.CMD_STATUS && baseFrame.FrameData.ConcreteData[0] == Code.DEVICE_PROGRAM)
-                    {
-                        // 帧有效数据
-                        ValidData validData;
-
-                        // 通信失败
-                        if (!CmdHelper.frmDAE.isCanNetSuccess)
-                            validData = new ValidData(Code.CMD_STATUS, new byte[] { Code.DEVICE_PROGRAM, Code.ERROR_COMM, 0 });
-                        else
-                        {
-                            // 运行中
-                            if (isRunning)
-                                validData = new ValidData(Code.CMD_STATUS, new byte[] { Code.DEVICE_PROGRAM, 0x01, 0 });
-                            // 待机中
-                            else
-                                validData = new ValidData(Code.CMD_STATUS, new byte[] { Code.DEVICE_PROGRAM, 0x00, 0 });
-                        }
-                        SerialPortSender(serialDevice, validData);
-                    }
-                }
-                else
-                    LogHelper.Error((string)this.FindResource("Prompt_Check_Code_Error"));
-            }
-            catch (Exception ex)
-            {
-                LogHelper.Error((string)this.FindResource("Prompt_Frame_Error") + "：" + ex.StackTrace);
-            }
-
-        }
-
-        /// <summary>
-        /// 串口发送数据
-        /// </summary>
-        /// <param name="serialDevice"></param>
-        /// <param name="responseFrame"></param>
-        private static void SerialPortSender(SerialPort serialDevice, ValidData validData)
-        {
-            BaseFrame responseFrame = new BaseFrame(validData);
-            serialDevice.Write(responseFrame.TotalData, 0, responseFrame.TotalData.Length);
-            // 打印串口响应数据
-            string hexString = String.Join(" ", responseFrame.TotalData.Select(b => b.ToString("X2")));
-            LogHelper.Info((string)Application.Current.FindResource("Prompt_Serial_Data_Sender"), hexString);
-        }
-
-        /// <summary>
-        /// 串口执行完成回调
-        /// </summary>
-        public class SerialPortCompletedCallBack : MyCallBack
-        {
-            private SerialPort mSerialPort;
-            // 程序编号
-            private byte mProgramNo;
-
-            public SerialPortCompletedCallBack(SerialPort serialDevice, byte programNo)
-            {
-                mSerialPort = serialDevice;
-                mProgramNo = programNo;
-            }
-
-            public override void Callback()
-            {
-                var validData = new ValidData(Code.CMD_CONTROL, new byte[] { Code.DEVICE_PROGRAM, 0x00, mProgramNo });
-                SerialPortSender(mSerialPort, validData);
-            }
-        }
-        #endregion
 
         /// <summary>
         /// 设置loading框状态
@@ -1204,1629 +991,133 @@ namespace AutoLiquid_GenScript_Single_Handling
         }
 
         /// <summary>
-        /// 执行程序（带耗材摆放提示）
+        /// 执行程序（带轮次提示）
+        /// Round=1 的 seq 先执行，执行完后提示用户摆放后续轮次耗材，再继续
         /// </summary>
-        /// <param name="replaceTipOverRange">超过量程分液是否更换枪头</param>
         private void RunProcedure(bool replaceTipOverRange)
         {
-            // 提示是否已经摆放好板
-            if (MessageBox.Show((string)this.FindResource("Prompt_Need_To_Put_Template_OK"),
-                    (string)this.FindResource("Prompt"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) ==
-                MessageBoxResult.OK)
-            {
-                RunProcedure(replaceTipOverRange, true);
-            }
+            int maxRound = seqList.Count == 0 ? 1 : seqList.Max(s => s.Round);
+
+            // 第1轮：提示摆放第1轮耗材
+            if (MessageBox.Show(
+                    BuildRoundPrompt(1, maxRound),
+                    (string)this.FindResource("Prompt"),
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning) != MessageBoxResult.OK)
+                return;
+
+            RunRound(replaceTipOverRange, 1, maxRound);
+        }
+
+        /// <summary>
+        /// 构建轮次提示文本
+        /// </summary>
+        private string BuildRoundPrompt(int round, int maxRound)
+        {
+            if (maxRound <= 1)
+                return (string)this.FindResource("Prompt_Need_To_Put_Template_OK");
+
+            // 收集本轮用到的盘名
+            var roundSeqs = seqList.Where(s => s.Round == round).ToList();
+            var srcNames = roundSeqs.Select(s => s.SourceTemplateName).Distinct();
+            var dstNames = roundSeqs.Select(s => s.TargetTemplateName).Distinct();
+            var allNames = srcNames.Union(dstNames).Distinct();
+            return $"第 {round} / {maxRound} 轮，请摆放以下耗材后点击确认：\n" +
+                   string.Join("\n", allNames.Select(n => "  • " + n));
         }
 
         /// <summary>
         /// 执行程序
         /// </summary>
         /// <param name="replaceTipOverRange">超过量程分液是否更换枪头</param>
-        /// <param name="isSuccessHint">完成后是否弹出框提示</param>
-        /// <param name="completedCallback">执行完成回调（与第三方设备通信使用）</param>
-        private void RunProcedure(bool replaceTipOverRange, bool isSuccessHint, MyCallBack completedCallback = null)
+        /// <param name="currentRound">当前轮次</param>
+        /// <param name="maxRound">最大轮次</param>
+        /// <summary>
+        /// 执行指定轮次（在后台线程中按轮次顺序运行，每轮结束后弹框提示）
+        /// </summary>
+        private void RunRound(bool replaceTipOverRange, int currentRound, int maxRound)
         {
-            Dispatcher.Invoke(() => { SetLoadingStatus(ERunStatus.Running); });
+            Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Running));
+
             var thread = new Thread(() =>
             {
                 try
                 {
-                    LogHelper.InfoTitle((string)this.FindResource("ExecFile") + "《" + excelFilesNameImported + "》");
+                    LogHelper.InfoTitle((string)this.FindResource("ExecFile") + "《" + excelFilesNameImported + "》 第" + currentRound + "轮");
 
-                    /**
-                     * 计算多点校准
-                     */
                     CalcCalibration();
 
-                    // 运行前发送速度指令
                     for (var headIndex = 0; headIndex < ParamsHelper.HeadList.Count; headIndex++)
-                    {
                         if (ParamsHelper.HeadList[headIndex].Available)
                             CmdHelper.SpeedSet(headIndex, EAxis.All, "", 100, true);
-                    }
 
-                    // 初始化
                     CmdHelper.InitMachine(true, false);
 
-                    TakeAction(replaceTipOverRange);
+                    // 只执行本轮的 seq
+                    TakeActionForRound(replaceTipOverRange, currentRound);
 
-                    // 初始化
                     CmdHelper.InitMachineAndEasy2Put(true, false);
 
-                    LogHelper.InfoTail((string)this.FindResource("ExecCompleted"));
+                    LogHelper.InfoTail((string)this.FindResource("ExecCompleted") + " 第" + currentRound + "轮");
 
-                    Dispatcher.Invoke(() =>
+                    if (currentRound < maxRound)
                     {
-                        SetLoadingStatus(ERunStatus.Stop);
-                        // 如果枪头退回到取枪头位置，就把取枪头位置自动置满
-                        for (var headIndex = 0; headIndex < ParamsHelper.CommonSettingList.Count; headIndex++)
+                        // 还有后续轮次：在 UI 线程提示用户摆放下一轮耗材
+                        bool continueNext = false;
+                        Dispatcher.Invoke(() =>
                         {
-                            var commonSetting = ParamsHelper.CommonSettingList[headIndex];
-                            if (commonSetting.ReleaseTipBack2TakePos)
+                            continueNext = MessageBox.Show(
+                                BuildRoundPrompt(currentRound + 1, maxRound),
+                                (string)this.FindResource("Prompt"),
+                                MessageBoxButton.OKCancel,
+                                MessageBoxImage.Warning) == MessageBoxResult.OK;
+                        });
+
+                        if (continueNext)
+                        {
+                            RunRound(replaceTipOverRange, currentRound + 1, maxRound);
+                        }
+                        else
+                        {
+                            // 用户取消后续轮次
+                            Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Stop));
+                        }
+                    }
+                    else
+                    {
+                        // 全部轮次完成
+                        Dispatcher.Invoke(() =>
+                        {
+                            SetLoadingStatus(ERunStatus.Stop);
+                            // 退枪头位置置满
+                            for (var headIndex = 0; headIndex < ParamsHelper.CommonSettingList.Count; headIndex++)
                             {
-                                var tipTemplates = tipTemplateDict.Values.Where(p => p.HeadUsedIndex == headIndex);
-                                foreach (var tipTemplate in tipTemplates)
+                                var commonSetting = ParamsHelper.CommonSettingList[headIndex];
+                                if (commonSetting.ReleaseTipBack2TakePos)
                                 {
-                                    tipTemplate.SplitButtonTipsBoxPos.SelectedIndex = 0;
+                                    foreach (var tipTemplate in tipTemplateDict.Values.Where(p => p.HeadUsedIndex == headIndex))
+                                        tipTemplate.SplitButtonTipsBoxPos.SelectedIndex = 0;
                                 }
                             }
-                        }
-                        if (isSuccessHint)
                             MessageBox.Show((string)this.FindResource("Prompt_Liquid_Relief_Success"));
-                    });
-
-                    if (completedCallback != null)
-                        completedCallback.Callback();
+                        });
+                    }
                 }
-                catch (ManualStopException)
-                {
-                }
+                catch (ManualStopException) { }
             });
             thread.IsBackground = true;
             thread.Start();
         }
 
         /// <summary>
-        /// 导入文档
+        /// 仅执行 Round == currentRound 的 Seq
         /// </summary>
-        private void ShowImportDialog()
+        private void TakeActionForRound(bool replaceTipOverRange, int currentRound)
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Filter = "Excel Files|*.xls;*.xlsx;*.xlsm";
-            var result = dialog.ShowDialog();
-            if (result == true)
-            {
-                // 导入excel
-                excelFilesNameImported = dialog.SafeFileName;
-                ImportExcel(dialog.FileName);
-            }
-        }
+            var thisRoundSeqList = seqList.Where(s => s.Round == currentRound).ToList();
 
-        /// <summary>
-        /// 导入Excel
-        /// </summary>
-        /// <param name="filePath">文件路径</param>
-        private void ImportExcel(string filePath)
-        {
-            // 解析excel数据
-            this.LayoutImportLoading.Visibility = Visibility.Visible;
-            BackgroundProcess.RunAsync(() => ParseDataFromExcel(filePath), delegate (object returnResult)
-            {
-                this.LayoutImportLoading.Visibility = Visibility.Collapsed;
-                if ((bool)returnResult)
-                {
-                    MessageBox.Show((string)this.FindResource("Prompt_Import_Success"));
-                }
-                else
-                {
-                    MessageBox.Show((string)this.FindResource("Prompt_Import_Error"));
-                }
-            });
-        }
-
-        /// <summary>
-        /// 解析Excel数据
-        /// </summary>
-        /// <param name="filePath">文件路径</param>
-        /// <returns></returns>
-        private bool ParseDataFromExcel(string filePath)
-        {
-            using (Workbook workbook = new Workbook())
-            {
-                try
-                {
-                    workbook.LoadFromFile(filePath);
-                }
-                catch (Exception e)
-                {
-                    MessageBox.Show((string)this.FindResource("Prompt_Pls_Close_Excel_File_First"));
-                    LogHelper.Error(e.StackTrace);
-                    return false;
-                }
-
-                Worksheet ws = null;
-                try
-                {
-                    ws = workbook.Worksheets[0];
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show((string)this.FindResource("Prompt_Excel_Must_Be_Xlsx_File_Or_File_Destroy"));
-                    LogHelper.Error(ex.StackTrace);
-                    return false;
-                }
-
-                // 先清空原数据
-                seqList.Clear();
-                // 读取的开始行
-                var rowIndex = 3;
-                try
-                {
-                    /**
-                     * Excel列
-                     */
-                    const int tipTemplateIndexCol = 1; // 枪头盘位列
-                    const int tipTemplateConsumableTypeCol = 2;  // 枪头盘耗材类型列
-
-                    const int sourceTemplateIndexCol = 3; // 源盘盘位列
-                    const int sourceTemplateConsumableTypeCol = 4;  // 源盘耗材类型列
-                    const int sourceHoleIndexCol = 5; // 源盘孔位置列
-
-                    const int targetTemplateIndexCol = 7; // 靶盘盘位列
-                    const int targetTemplateConsumableTypeCol = 8;  // 靶盘耗材类型列
-                    const int targetHoleIndexCol = 9; // 靶盘孔位置列
-                    const int volumeCol = 10; // 每孔体积列
-
-                    const int absorbMixingVolumeCol = 11; // 吸前混合体积
-                    const int absorbMixingCountCol = 12; // 吸前混合次数
-                    const int jetMixingVolumeCol = 13; // 喷后混合体积
-                    const int jetMixingCountCol = 14; // 喷后混合次数
-
-                    const int absorbWallCol = 15;  // 吸液靠壁
-                    const int jetWallCol = 16;  // 喷液靠壁
-
-                    const int replaceTipCol = 17; // 是否插枪头
-                    const int tipChannelCol = 18; // 取枪头数目
-
-                    int cmdCol = 18; // 特殊指令
-                    // 兼容Excel包含“取枪头数目”版本
-                    var isNeedTipChannel = false;
-                    if (null != ws.Range[1, 19].Text && ws.Range[1, 19].Text.Trim().Contains((string)this.FindResource("SpecialCmd")))
-                    {
-                        cmdCol = 19;
-                        isNeedTipChannel = true;
-                    }
-
-                    // 判断是否存在数据
-                    if (null == ws.Range[rowIndex, sourceTemplateIndexCol].Value && null == ws.Range[rowIndex, cmdCol].Text)
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            MessageBox.Show(
-                                (string)this.FindResource(
-                                    "Prompt_Import_Excel_Must_Not_Be_Empty"));
-                        });
-                        return false;
-                    }
-
-                    // 逐一解析每行数据
-                    while (true)
-                    {
-                        // 源盘 、靶盘板位 和 特殊指令
-                        var sourceTemplateIndexEmpty = ViewUtils.CheckExcelCellEmpty(ws.Range[rowIndex, sourceTemplateIndexCol]);
-                        var targetTemplateIndexEmpty = ViewUtils.CheckExcelCellEmpty(ws.Range[rowIndex, targetTemplateIndexCol]);
-                        var cmdContent = ws.Range[rowIndex, cmdCol].Text;
-                        var cmdEmpty = ViewUtils.CheckExcelCellEmpty(ws.Range[rowIndex, cmdCol]);
-                        // 注意：targetTemplateIndexEmpty为null 不能简单判断，还需要判断内容是否为空
-                        if (!targetTemplateIndexEmpty || !cmdEmpty)
-                        {
-                            // 特殊指令
-                            var cmd = cmdEmpty ? "" : cmdContent.Trim();
-
-                            // txt文件链接（执行txt内容）
-                            var isTxtLink = false;
-                            if (cmd.ToLower().Contains(".txt"))
-                            {
-                                string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                                var txtFilesNameList = Directory.EnumerateFiles(rootPath, "*.txt", SearchOption.TopDirectoryOnly)
-                                    .Select(f => Path.GetFileName(f)).Where(p => !p.StartsWith("AutoLiquid_Update_Log") && p.StartsWith(cmd.ToLower())).ToList();
-                                var txtFilesNameListCount = txtFilesNameList.Count();
-                                if (txtFilesNameListCount != 0)
-                                    cmd = File.ReadAllText(rootPath + @"\" + txtFilesNameList.ElementAt(0)).Trim();
-                                else
-                                {
-                                    Dispatcher.Invoke(() =>
-                                    {
-                                        MessageBox.Show(
-                                            (string)this.FindResource(
-                                                "Prompt_Txt_Link_File_Not_Exist"));
-                                    });
-                                    return false;
-                                }
-
-                                isTxtLink = true;
-                            }
-
-                            // 吸液、喷液前后特殊指令
-                            var cmdAbsorbBefore = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.AbsorbBeforeCmd, isTxtLink);
-                            var cmdAbsorbAfter = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.AbsorbAfterCmd, isTxtLink);
-                            var cmdJetBefore = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.JetBeforeCmd, isTxtLink);
-                            var cmdJetAfter = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.JetAfterCmd, isTxtLink);
-
-                            // 吸液混合、喷液混合前特殊指令
-                            var cmdAbsorbMixingBefore = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.AbsorbMixingBeforeCmd, isTxtLink);
-                            var cmdJetMixingBefore = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.JetMixingBeforeCmd, isTxtLink);
-                            // 吸液混合、喷液混合后特殊指令
-                            var cmdAbsorbMixingAfter = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.AbsorbMixingAfterCmd, isTxtLink);
-                            var cmdJetMixingAfter = ObjectUtils.GetCmdAccordTag(cmd,
-                                AutoLiquid_Library.Utils.ConstantsUtils.JetMixingAfterCmd, isTxtLink);
-
-                            // 是否只含有特殊指令
-                            if (targetTemplateIndexEmpty)
-                            {
-                                seqList.Add(new Seq { IsCmdOnly = true, Cmd = cmd });
-                                rowIndex++;
-                                continue;
-                            }
-
-                            // 使用的移液头Index
-                            var headUsedIndex = cmd.ToLower().Contains(AutoLiquid_Library.Utils.ConstantsUtils.Head2Cmd.ToLower()) && ParamsHelper.HeadList[1].Available ? 1 : 0;
-
-                            /**
-                             * 靶盘
-                             */
-                            // 靶盘盘位Index
-                            var targetTemplateIndexList = ws.Range[rowIndex, targetTemplateIndexCol].Value.Trim()
-                                .Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(x => int.Parse(x) - 1).ToList();
-                            // 靶盘耗材类型
-                            var targetTemplateConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, ws.Range[rowIndex, targetTemplateConsumableTypeCol].Text.Trim(), false);
-                            // 检查是否存在该耗材名字
-                            if (targetTemplateConsumableType == null)
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    MessageBox.Show(
-                                        (string)this.FindResource(
-                                            "Prompt_Import_Excel_Group_Name_Not_Exist"));
-                                });
-                                return false;
-                            }
-                            // 检查是否已经启用该盘位
-                            foreach (var targetTemplateIndex in targetTemplateIndexList)
-                            {
-                                if (!targetTemplateConsumableType.TemplateAvailableList[targetTemplateIndex])
-                                {
-                                    Dispatcher.Invoke(() =>
-                                    {
-                                        var prompt = (string)this.FindResource(
-                                                "Prompt_Pls_Enable_Template_In_User_Setting_1") + targetTemplateConsumableType
-                                                                                                    .GroupName
-                                                                                                + (string)this
-                                                                                                    .FindResource(
-                                                                                                        "Prompt_Pls_Enable_Template_In_User_Setting_2") + (targetTemplateIndex + 1);
-                                        MessageBox.Show(prompt);
-                                    });
-                                    return false;
-                                }
-                            }
-                            // 靶盘位置孔Index
-                            var targetHoleIndexList = ws.Range[rowIndex, targetHoleIndexCol].Value.Trim()
-                                .Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(x => ConsumableHelper.GetHoleIndex(headUsedIndex, targetTemplateConsumableType, x.Trim())).ToList();
-                            // 体积
-                            var volumeList = ws.Range[rowIndex, volumeCol].Value.Trim()
-                                .Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(x => decimal.Parse(x)).Select(d => new Volume { Original = d }).ToList();
-
-                            // 是否泵分液
-                            if (sourceTemplateIndexEmpty && !targetTemplateIndexEmpty && !cmdEmpty)
-                            {
-                                seqList.Add(new Seq
-                                {
-                                    TargetTemplateIndexList = targetTemplateIndexList,
-                                    TargetTemplateConsumableType = targetTemplateConsumableType,
-                                    TargetHoleIndexList = targetHoleIndexList,
-                                    VolumeEachList = volumeList,
-                                    Cmd = cmd,
-                                    IsPumpLiquid = true
-                                });
-                                rowIndex++;
-                                continue;
-                            }
-
-                            /**
-                             * 枪头
-                             */
-                            // 枪头盘位Index
-                            var tipTemplateIndex = short.Parse(ws.Range[rowIndex, tipTemplateIndexCol].Value) - 1;
-                            // 是否指定盘位取枪头
-                            var tipTemplateAssign = ws.Range["A1"].Text.Trim().Contains((string)this.FindResource("TemplateAssign"));
-                            // 枪头盒耗材类型
-                            var tipTemplateConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, ws.Range[rowIndex, tipTemplateConsumableTypeCol].Text.Trim(), true);
-                            // 检查是否存在该耗材名字
-                            if (tipTemplateConsumableType == null)
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    MessageBox.Show(
-                                        (string)this.FindResource(
-                                            "Prompt_Import_Excel_Group_Name_Not_Exist"));
-                                });
-                                return false;
-                            }
-                            // 检查是否已经启用该盘位
-                            if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    var prompt = (string)this.FindResource(
-                                            "Prompt_Pls_Enable_Template_In_User_Setting_1") + tipTemplateConsumableType
-                                                                                                .GroupName
-                                                                                            + (string)this
-                                                                                                .FindResource(
-                                                                                                    "Prompt_Pls_Enable_Template_In_User_Setting_2") + (tipTemplateIndex + 1);
-                                    MessageBox.Show(prompt);
-                                });
-                                return false;
-                            }
-
-                            /**
-                             * 源盘
-                             */
-                            // 源盘盘位Index
-                            var sourceTemplateIndex = short.Parse(ws.Range[rowIndex, sourceTemplateIndexCol].Value) - 1;
-                            // 源盘耗材类型
-                            var sourceTemplateConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, ws.Range[rowIndex, sourceTemplateConsumableTypeCol].Text.Trim(), false);
-                            // 检查是否存在该耗材名字
-                            if (sourceTemplateConsumableType == null)
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    MessageBox.Show(
-                                        (string)this.FindResource(
-                                            "Prompt_Import_Excel_Group_Name_Not_Exist"));
-                                });
-                                return false;
-                            }
-                            // 检查是否已经启用该盘位
-                            if (!sourceTemplateConsumableType.TemplateAvailableList[sourceTemplateIndex])
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    var prompt = (string)this.FindResource(
-                                            "Prompt_Pls_Enable_Template_In_User_Setting_1") + sourceTemplateConsumableType
-                                                                                                .GroupName
-                                                                                            + (string)this
-                                                                                                .FindResource(
-                                                                                                    "Prompt_Pls_Enable_Template_In_User_Setting_2") + (sourceTemplateIndex + 1);
-                                    MessageBox.Show(prompt);
-                                });
-                                return false;
-                            }
-                            // 源盘位置孔Index
-                            // var sourceHoleIndex =
-                            //     ConsumableHelper.GetHoleIndex(headUsedIndex, sourceTemplateConsumableType, ws.Range[rowIndex, sourceHoleIndexCol].Text.Trim());
-                            var sourceHoleIndexList = ws.Range[rowIndex, sourceHoleIndexCol].Value.Trim()
-                                .Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(x => ConsumableHelper.GetHoleIndex(headUsedIndex, sourceTemplateConsumableType, x.Trim())).ToList();
-
-
-                            /**
-                             * 混合信息
-                             */
-                            // 吸前混合
-                            var absorbMixingVolumeContent = ws.Range[rowIndex, absorbMixingVolumeCol].Value;
-                            var absorbMixingVolume = null == absorbMixingVolumeContent || absorbMixingVolumeContent.Equals("") ? 0m : decimal.Parse(absorbMixingVolumeContent.Trim());
-                            var absorbMixingCountContent = ws.Range[rowIndex, absorbMixingCountCol].Value;
-                            var absorbMixingCount = null == absorbMixingCountContent || absorbMixingCountContent.Equals("") ? 0 : short.Parse(absorbMixingCountContent.Trim());
-                            // 喷后混合
-                            var jetMixingVolumeContent = ws.Range[rowIndex, jetMixingVolumeCol].Value;
-                            var jetMixingVolume = null == jetMixingVolumeContent || jetMixingVolumeContent.Equals("") ? 0m : decimal.Parse(jetMixingVolumeContent.Trim());
-                            var jetMixingCountContent = ws.Range[rowIndex, jetMixingCountCol].Value;
-                            var jetMixingCount = null == jetMixingCountContent || jetMixingCountContent.Equals("") ? 0 : short.Parse(jetMixingCountContent.Trim());
-
-                            /**
-                             * 靠壁
-                             */
-                            // 吸液靠壁
-                            var absorbWall = null == ws.Range[rowIndex, absorbWallCol].Text ? "" : ws.Range[rowIndex, absorbWallCol].Text.Trim();
-                            var absorbWallList = ExcelHelper.GetWallList(absorbWall);
-                            // 喷液靠壁
-                            var jetWall = null == ws.Range[rowIndex, jetWallCol].Text ? "" : ws.Range[rowIndex, jetWallCol].Text.Trim();
-                            var jetWallList = ExcelHelper.GetWallList(jetWall);
-
-                            // 是否注释该行序列
-                            var isComment = cmd.Contains("//");
-
-                            // 是否取枪头
-                            var isTakeTip = ws.Range[rowIndex, replaceTipCol].Text.Trim().Equals((string)this.FindResource("Yes"));
-                            // 取枪头数目
-                            var tipChannel = isNeedTipChannel && !ViewUtils.CheckExcelCellEmpty(ws.Range[rowIndex, tipChannelCol]) ? TipHelper.GetTipChannel2DArray(headUsedIndex, int.Parse(ws.Range[rowIndex, tipChannelCol].Value.Trim()))
-                                : new int[ParamsHelper.HeadList[headUsedIndex].ChannelRow, ParamsHelper.HeadList[headUsedIndex].ChannelCol];
-
-                            // 是否用于梯度稀释
-                            var serialDilute = targetTemplateConsumableType.JetMixingHeight > 0 && jetMixingVolume > 0 && jetMixingCount > 0 && targetHoleIndexList.Count > 1;
-
-                            // 喷液体积补偿
-                            var cmdJetOffset = ObjectUtils.GetCmdAccordTag(cmd, AutoLiquid_Library.Utils.ConstantsUtils.JetOffsetCmd, isTxtLink);
-                            var jetOffsetList = GetJetOffset(cmdJetOffset);
-
-                            // 一吸多喷喷液后回吸体积
-                            var cmdVolumeBackAbsorb = ObjectUtils.GetCmdAccordTag(cmd, AutoLiquid_Library.Utils.ConstantsUtils.BackAbsorbCmd, isTxtLink);
-                            var volumeBackAbsorb = cmdVolumeBackAbsorb.Equals("") ? 0 : decimal.Parse(cmdVolumeBackAbsorb);
-
-                            // 吸液后多吸体积
-                            var cmdSourceVolumeAbsorbMore = ObjectUtils.GetCmdAccordTag(cmd, AutoLiquid_Library.Utils.ConstantsUtils.AbsorbMoreCmd, isTxtLink);
-                            var sourceVolumeAbsorbMore = cmdSourceVolumeAbsorbMore.Equals("") ? 0 : decimal.Parse(cmdSourceVolumeAbsorbMore);
-
-                            // 吸后反喷体积
-                            var cmdSourceVolumeReverseJet = ObjectUtils.GetCmdAccordTag(cmd, AutoLiquid_Library.Utils.ConstantsUtils.ReverseJetCmd, isTxtLink);
-                            var sourceVolumeReverseJet = cmdSourceVolumeReverseJet.Equals("") ? 0 : decimal.Parse(cmdSourceVolumeReverseJet);
-
-                            // 多吸液体返回源孔喷出
-                            var reJet2Source = cmd.ToLower().Contains(AutoLiquid_Library.Utils.ConstantsUtils.ReJet2SourceCmd.ToLower());
-
-                            var seq = new Seq
-                            {
-                                TipTemplateIndex = tipTemplateIndex,
-                                TipTemplateAssign = tipTemplateAssign,
-                                TipTemplateConsumableType = tipTemplateConsumableType,
-                                IsTakeTip = isTakeTip,
-                                TipChannel = tipChannel,
-                                SourceTemplateIndex = sourceTemplateIndex,
-                                SourceTemplateConsumableType = sourceTemplateConsumableType,
-                                // SourceHoleIndex = sourceHoleIndex,
-                                SourceHoleIndexList = sourceHoleIndexList, // 20250625 SourceHoleIndex改成SourceHoleIndexList
-                                SourceVolumeAbsorbMore = sourceVolumeAbsorbMore,
-                                SourceVolumeReverseJet = sourceVolumeReverseJet,
-                                ReJet2Source = reJet2Source,
-                                TargetTemplateIndexList = targetTemplateIndexList,
-                                TargetTemplateConsumableType = targetTemplateConsumableType,
-                                TargetHoleIndexList = targetHoleIndexList,
-                                SerialDilute = serialDilute,
-                                JetOffsetList = jetOffsetList,
-                                VolumeBackAbsorb = volumeBackAbsorb,
-                                VolumeEachList = volumeList,
-                                AbsorbMixingVolume = absorbMixingVolume,
-                                AbsorbMixingCount = absorbMixingCount,
-                                JetMixingVolume = jetMixingVolume,
-                                JetMixingCount = jetMixingCount,
-                                AbsorbWallList = absorbWallList,
-                                JetWallList = jetWallList,
-                                IsTxtLink = isTxtLink,
-                                Cmd = cmd,
-                                CmdAbsorbBefore = cmdAbsorbBefore,
-                                CmdAbsorbAfter = cmdAbsorbAfter,
-                                CmdJetBefore = cmdJetBefore,
-                                CmdJetAfter = cmdJetAfter,
-                                CmdAbsorbMixingBefore = cmdAbsorbMixingBefore,
-                                CmdAbsorbMixingAfter = cmdAbsorbMixingAfter,
-                                CmdJetMixingBefore = cmdJetMixingBefore,
-                                CmdJetMixingAfter = cmdJetMixingAfter,
-                                IsComment = isComment,
-                                HeadUsedIndex = headUsedIndex
-                            };
-                            seqList.Add(seq);
-                        }
-                        else
-                            break;
-
-                        rowIndex++;
-                    }
-
-
-                    try
-                    {
-                        // 初始化盘位信息
-                        Dispatcher.Invoke(InitTemplates);
-                        // 重新计算吸液、喷液位置（仅适用于灵活取枪头，如不需要灵活取枪头，可不调用）
-                        AllocateAbsorbAndJetInfo();
-                        // 分配退枪头信息
-                        AllocateReleaseTipInfo();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show((string)this.FindResource("Prompt_Pls_Check_Excel_And_Consumable_Info"));
-                        LogHelper.Error(ex.StackTrace);
-                        return false;
-                    }
-
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show((string)this.FindResource("Prompt_Excel_Error_1") + rowIndex +
-                                    (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
-                    LogHelper.Error(ex.StackTrace);
-                    return false;
-                }
-            }
-        }
-
-        /// <summary>
-        /// 获取喷液补偿信息
-        /// </summary>
-        /// <param name="cmdJetOffset"></param>
-        /// <returns></returns>
-        private List<JetOffset> GetJetOffset(string cmdJetOffset)
-        {
-            var jetOffsetList = new List<JetOffset>();
-            if (!cmdJetOffset.Equals(""))
-            {
-                var items = cmdJetOffset.Split(new[] { "(", ")" }, StringSplitOptions.RemoveEmptyEntries).Where(p => !p.Equals(",")).ToList();
-                foreach (var item in items)
-                {
-                    var content = item.Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries);
-                    var posStr = content[0];
-                    var volume = decimal.Parse(content[1]);
-                    // 判断是否孔位范围
-                    if (posStr.Contains("-") || posStr.Contains("~"))
-                    {
-                        var posRange = posStr.Split(new[] { '-', '~' }, StringSplitOptions.RemoveEmptyEntries);
-                        var fromPosIndex = int.Parse(posRange[0]) - 1;
-                        var toPosIndex = int.Parse(posRange[1]) - 1;
-                        for (var index = fromPosIndex; index <= toPosIndex; index++)
-                        {
-                            jetOffsetList.Add(new JetOffset { PosIndex = index, VolumeOffset = volume });
-                        }
-                    }
-                    else
-                    {
-                        var posIndex = int.Parse(posStr) - 1;
-                        var jetOffset = jetOffsetList.FirstOrDefault(p => p.PosIndex == posIndex);
-                        if (null != jetOffset)
-                            jetOffset.VolumeOffset = volume;
-                        else
-                            jetOffsetList.Add(new JetOffset { PosIndex = posIndex, VolumeOffset = volume });
-                    }
-                }
-            }
-
-            return jetOffsetList;
-        }
-
-        /// <summary>
-        /// 计算多点校准
-        /// </summary>
-        private void CalcCalibration()
-        {
-            foreach (var seq in seqList)
-            {
-                var headIndex = seq.HeadUsedIndex;
-                foreach (var volume in seq.VolumeEachList)
-                {
-                    volume.Calibration = Utils.DataHelper.CalibrateVol(headIndex, volume.Original);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 初始化盘位信息
-        /// </summary>
-        private void InitTemplates()
-        {
-            // 先清空原盘位数据
-            foreach (var t in templateCanUse)
-            {
-                t.Children.Clear();
-            }
-
-            tipTemplateDict.Clear();
-            sourceTemplateDict.Clear();
-            targetTemplateDict.Clear();
-
-            // 由于可能存在ep管架之类的占据多个盘面的耗材，所以先复位每个盘位占据盘面个数为1
-            for (var i = 0; i < this.GridTemplateContainer.Children.Count; i++)
-            {
-                var controlTemplate = this.GridTemplateContainer.Children[i] as UserControls.ControlTemplate;
-                Grid.SetRow(controlTemplate, 0);
-                Grid.SetRowSpan(controlTemplate, ConstantsUtils.TemplateOccupyGridSpan);
-                Grid.SetColumn(controlTemplate, 0);
-                Grid.SetColumnSpan(controlTemplate, ConstantsUtils.TemplateOccupyGridSpan);
-            }
-
-            // 枪头盒、源盘、靶盘盘位标题计数器
-            var tipTemplateTitleTick = 0;
-            var sourceTemplateTitleTick = 0;
-            var targetTemplateTitleTick = 0;
-            foreach (var seq in seqList)
-            {
-                // 只含有特殊指令
-                if (seq.IsCmdOnly)
-                    continue;
-
-                var tipTemplateConsumableType = seq.TipTemplateConsumableType;
-                var tipTemplateIndex = seq.TipTemplateIndex;
-                var tipChannel = seq.TipChannel;
-                var sourceTemplateConsumableType = seq.SourceTemplateConsumableType;
-                var sourceTemplateIndex = seq.SourceTemplateIndex;
-                // var sourceHoleIndex = seq.SourceHoleIndex;
-                var sourceHoleIndexList = seq.SourceHoleIndexList; // 20250625 SourceHoleIndex改成SourceHoleIndexList
-                var volumeEachList = seq.VolumeEachList;
-                var targetTemplateConsumableType = seq.TargetTemplateConsumableType;
-                var targetTemplateIndexList = seq.TargetTemplateIndexList;
-                var targetHoleIndexList = seq.TargetHoleIndexList;
-                var serialDilute = seq.SerialDilute;
-                var headUsedIndex = seq.HeadUsedIndex;
-                var isPumpLiquid = seq.IsPumpLiquid;
-
-
-                // 枪头盘位
-                if (!isPumpLiquid)
-                {
-                    if (!tipTemplateDict.ContainsKey(tipTemplateIndex))
-                    {
-                        // 设置占用盘位
-                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, tipTemplateIndex, tipTemplateConsumableType.TemplateOccupySpan);
-
-                        tipTemplateTitleTick++;
-                        var template = new Template
-                        {
-                            Title = (string)this.FindResource("TemplateTips") + tipTemplateTitleTick,
-                            RowCount = tipTemplateConsumableType.RowCount,
-                            ColCount = tipTemplateConsumableType.ColCount,
-                            Step = tipTemplateConsumableType.HoleStep,
-                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
-                            Type = ETemplateType.Tip
-                        };
-                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
-                        for (var i = 0; i < holeTotalCount; i++)
-                        {
-                            template.Holes.Add(new Hole { Index = i });
-                        }
-                        // 枪头盒是否灵活取枪头（判断所有seq是否含有自定义取枪头数目，如果是，则认为是灵活取枪头）
-                        var tipBoxFlexible = TipHelper.IsTipBoxFlexible(headUsedIndex, seqList, tipTemplateConsumableType);
-                        var controlTemplateTip = new ControlTemplateTip(template, tipTemplateConsumableType) { TipBoxTemplateIndex = tipTemplateIndex, TipBoxFlexible = tipBoxFlexible, HeadUsedIndex = headUsedIndex };
-                        tipTemplateDict.Add(tipTemplateIndex, controlTemplateTip);
-                        templateCanUse[tipTemplateIndex].Children.Add(controlTemplateTip);
-                    }
-                }
-
-                // 源盘盘位
-                if (!isPumpLiquid)
-                {
-                    var sourceTotalVolume = 0m; // 源孔所需液体量
-                    for (var i = 0; i < targetHoleIndexList.Count; i++)
-                    {
-                        if (serialDilute)
-                            sourceTotalVolume = volumeEachList[0].Original;
-                        // 如果一吸多喷投入体积只有一个，就默认为相同体积，否则体积数必须等于靶孔数
-                        else if (volumeEachList.Count > 1)
-                            sourceTotalVolume += volumeEachList[i].Original;
-                        else
-                            sourceTotalVolume += volumeEachList[0].Original;
-                    }
-                    if (!sourceTemplateDict.ContainsKey(sourceTemplateIndex))
-                    {
-                        // 设置占用盘位
-                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, sourceTemplateIndex, sourceTemplateConsumableType.TemplateOccupySpan);
-
-                        sourceTemplateTitleTick++;
-                        var template = new Template
-                        {
-                            Title = (string)this.FindResource("TemplateSource") + sourceTemplateTitleTick,
-                            SubTitle = sourceTemplateConsumableType.GroupName,
-                            RowCount = sourceTemplateConsumableType.RowCount,
-                            ColCount = sourceTemplateConsumableType.ColCount,
-                            Step = sourceTemplateConsumableType.HoleStep,
-                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
-                            Type = ETemplateType.Source
-                        };
-                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
-                        for (var i = 0; i < holeTotalCount; i++)
-                        {
-                            template.Holes.Add(new Hole { Index = i, Capacity = 0 });
-                        }
-
-                        var controlTemplate = new ControlTemplateCommon(template, sourceTemplateConsumableType);
-                        // controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
-                        // 20250625 SourceHoleIndex改成SourceHoleIndexList
-                        foreach (var sourceHoleIndex in sourceHoleIndexList)
-                        {
-                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
-                        }
-                        sourceTemplateDict.Add(sourceTemplateIndex, controlTemplate);
-                        templateCanUse[sourceTemplateIndex].Children.Add(controlTemplate);
-                    }
-                    else
-                    {
-                        if (!sourceTemplateDict.TryGetValue(sourceTemplateIndex, out var controlTemplate))
-                            return; // 该源盘位Index不存在
-                        // controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
-                        // 20250625 SourceHoleIndex改成SourceHoleIndexList
-                        foreach (var sourceHoleIndex in sourceHoleIndexList)
-                        {
-                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
-                        }
-                    }
-                }
-
-                // 靶盘盘位
-                var targetTemplateIndexCount = targetTemplateIndexList.Count;
-                for (var i = 0; i < targetTemplateIndexCount; i++)
-                {
-                    var targetTemplateIndex = targetTemplateIndexList[i];
-
-                    if (!targetTemplateDict.ContainsKey(targetTemplateIndex))
-                    {
-                        // 设置占用盘位
-                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, targetTemplateIndex, targetTemplateConsumableType.TemplateOccupySpan);
-
-                        targetTemplateTitleTick++;
-                        var template = new Template
-                        {
-                            Title = (string)this.FindResource("TemplateTarget") + targetTemplateTitleTick,
-                            SubTitle = targetTemplateConsumableType.GroupName,
-                            RowCount = targetTemplateConsumableType.RowCount,
-                            ColCount = targetTemplateConsumableType.ColCount,
-                            Step = targetTemplateConsumableType.HoleStep,
-                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
-                            Type = ETemplateType.Target
-                        };
-                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
-                        for (var j = 0; j < holeTotalCount; j++)
-                        {
-                            template.Holes.Add(new Hole { Index = j, Capacity = 0 });
-                        }
-
-                        var controlTemplate = new ControlTemplateCommon(template, targetTemplateConsumableType);
-
-                        // 多靶多孔
-                        if (targetTemplateIndexCount > 1)
-                        {
-                            var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[i] : volumeEachList[0];
-                            var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
-                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndexList[i], tipChannel, targetVolumeTotal);
-                        }
-                        // 1靶多孔
-                        else
-                        {
-                            for (var j = 0; j < targetHoleIndexList.Count; j++)
-                            {
-                                var targetHoleIndex = targetHoleIndexList[j];
-                                var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[j] : volumeEachList[0];
-                                var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
-                                controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndex, tipChannel, targetVolumeTotal);
-                            }
-                        }
-
-                        targetTemplateDict.Add(targetTemplateIndex, controlTemplate);
-                        templateCanUse[targetTemplateIndex].Children.Add(controlTemplate);
-                    }
-                    else
-                    {
-                        if (!targetTemplateDict.TryGetValue(targetTemplateIndex, out var controlTemplate))
-                            return; // 该靶盘位Index不存在
-
-                        // 多靶多孔
-                        if (targetTemplateIndexCount > 1)
-                        {
-                            var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[i] : volumeEachList[0];
-                            var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
-                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndexList[i], tipChannel, targetVolumeTotal);
-                        }
-                        // 1靶多孔
-                        else
-                        {
-                            for (var j = 0; j < targetHoleIndexList.Count; j++)
-                            {
-                                var targetHoleIndex = targetHoleIndexList[j];
-                                var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[j] : volumeEachList[0];
-                                var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
-                                controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndex, tipChannel, targetVolumeTotal);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// 重新计算吸液、喷液位置（仅适用于灵活取枪头，如不需要灵活取枪头，可不调用）
-        /// </summary>
-        private void AllocateAbsorbAndJetInfo()
-        {
-            for (var i = 0; i < seqList.Count; i++)
-            {
-                var seq = seqList[i];
-
-                if (seq.IsCmdOnly)
-                    continue;
-
-                var headUsedIndex = seq.HeadUsedIndex;
-
-                // 移液头
-                var head = ParamsHelper.HeadList[headUsedIndex];
-
-                // 枪头盒耗材
-                var tipTemplateConsumableType = seq.TipTemplateConsumableType;
-                var tipTemplateConsumableHoleStep = tipTemplateConsumableType.HoleStep;
-
-                // 所需枪头行、列数
-                var tipChannelRow = seq.TipChannel.GetLength(0);
-                var tipChannelCol = seq.TipChannel.GetLength(1);
-
-                // 源盘耗材
-                var sourceTemplateConsumableType = seq.SourceTemplateConsumableType;
-                var sourceTemplateConsumableRow = sourceTemplateConsumableType.RowCount;
-                var sourceTemplateConsumableCol = sourceTemplateConsumableType.ColCount;
-                var sourceTemplateConsumableHoleStep = sourceTemplateConsumableType.HoleStep;
-                var sourceHoleIndex = seq.SourceHoleIndexList[0];
-
-                // 靶盘耗材
-                var targetTemplateConsumableType = seq.TargetTemplateConsumableType;
-                var targetTemplateConsumableRow = targetTemplateConsumableType.RowCount;
-                var targetTemplateConsumableCol = targetTemplateConsumableType.ColCount;
-                var targetTemplateConsumableHoleStep = targetTemplateConsumableType.HoleStep;
-
-                // 移液头间距与耗材是否不一致
-                // var tipHoleStepNotSameAsSourceX = tipChannelCol > 1 && sourceTemplateConsumableHoleStep.X > 0 && tipTemplateConsumableHoleStep.X != sourceTemplateConsumableHoleStep.X;
-                // var tipHoleStepNotSameAsSourceY = tipChannelRow > 1 && sourceTemplateConsumableHoleStep.Y > 0 && tipTemplateConsumableHoleStep.Y != sourceTemplateConsumableHoleStep.Y;
-                // var tipHoleStepNotSameAsTargetX = tipChannelCol > 1 && targetTemplateConsumableHoleStep.X > 0 && tipTemplateConsumableHoleStep.X != targetTemplateConsumableHoleStep.X;
-                // var tipHoleStepNotSameAsTargetY = tipChannelRow > 1 && targetTemplateConsumableHoleStep.Y > 0 && tipTemplateConsumableHoleStep.Y != targetTemplateConsumableHoleStep.Y;
-                var tipHoleStepNotSameAsSourceX = head.ChannelCol > 1 && sourceTemplateConsumableHoleStep.X > 0 && tipTemplateConsumableHoleStep.X != sourceTemplateConsumableHoleStep.X;
-                var tipHoleStepNotSameAsSourceY = head.ChannelRow > 1 && sourceTemplateConsumableHoleStep.Y > 0 && tipTemplateConsumableHoleStep.Y != sourceTemplateConsumableHoleStep.Y;
-                var tipHoleStepNotSameAsTargetX = head.ChannelCol > 1 && targetTemplateConsumableHoleStep.X > 0 && tipTemplateConsumableHoleStep.X != targetTemplateConsumableHoleStep.X;
-                var tipHoleStepNotSameAsTargetY = head.ChannelRow > 1 && targetTemplateConsumableHoleStep.Y > 0 && tipTemplateConsumableHoleStep.Y != targetTemplateConsumableHoleStep.Y;
-
-                // y轴移动系数（正方向：头移动；反方向：盘移动）
-                var yDirectionFactor = ParamsHelper.HeadList[headUsedIndex].YMoveWithHead ? 1 : -1;
-
-                // 移液头通道数
-                var headChannelRow = ParamsHelper.HeadList[headUsedIndex].ChannelRow;
-                var headChannelCol = ParamsHelper.HeadList[headUsedIndex].ChannelCol;
-                // A1摆放位置
-                var a1Pos = ParamsHelper.CommonSettingList[headUsedIndex].A1Pos;
-                // 逐列取枪头
-                var takeTipEachCol = ParamsHelper.CommonSettingList[headUsedIndex].TakeTipEachCol;
-                // 取枪头方向：从左往右
-                var takeTipLeft2Right = ParamsHelper.CommonSettingList[headUsedIndex].TakeTipLeft2Right || headChannelRow * headChannelCol == 1;
-
-                // 是否灵活取枪头
-                bool isTakeTipFlexible = TipHelper.IsTakeTipFlexible(headUsedIndex, seq.TipChannel, tipTemplateConsumableType);
-
-                // 是否灵活取枪头
-                if (isTakeTipFlexible)
-                {
-                    // A1左上
-                    if (a1Pos == EA1Pos.LeftTop)
-                    {
-                        // 逐列取
-                        if (takeTipEachCol)
-                        {
-                            /**
-                             * 源孔
-                             */
-                            // 所在列Index
-                            var sourceColIndex = sourceHoleIndex.OriIndex / sourceTemplateConsumableRow * sourceTemplateConsumableRow;
-
-                            /**
-                            * 移液头偏移逻辑：
-                            * ①移液头多列，整列取：X轴偏移
-                            * ②移液头多列，灵活取：X、Y轴偏移
-                            * ③移液头单列，Y轴偏移
-                            */
-                            // 偏移 = 取枪头数目Col - 移液头通道Col
-                            var sourceXHoleOffset = takeTipLeft2Right ? tipChannelCol - headChannelCol : 0;
-                            // 偏移 = holeIndex + 取枪头数目Row -（所在列首孔Index + 移液头通道Row）
-                            var sourceYHoleOffset = (sourceHoleIndex.OriIndex + tipChannelRow - (sourceColIndex + headChannelRow)) * yDirectionFactor;
-                            sourceHoleIndex.XHoleOffset = sourceXHoleOffset;
-                            sourceHoleIndex.YHoleOffset = sourceYHoleOffset;
-
-                            // 移液头通道间距与耗材间距是否不一致
-                            if (!head.IsVariable)
-                            {
-                                // 单通道
-                                if (tipChannelRow == 1)
-                                {
-                                    sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为列index即可
-                                    if (!sourceHoleIndex.StepNotSameX && !sourceHoleIndex.StepNotSameY)
-                                        sourceHoleIndex.OriIndex = sourceColIndex;
-
-                                    // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                    // （暂舍弃 2024-03-18）
-                                    // if (stepNotSameAsSourceX && sourceTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && sourceTemplateConsumableRow == 1)
-                                    // {
-                                    //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                    //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                    // }
-                                    // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材row数大于移液头row数，YHoleOffset默认为负数
-                                    if (sourceHoleIndex.StepNotSameY && sourceTemplateConsumableRow > headChannelRow)
-                                        sourceHoleIndex.YHoleOffset = -1;
-                                }
-                                // 多通道
-                                else
-                                {
-                                    // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                    if (tipChannelRow > sourceTemplateConsumableRow)
-                                    {
-                                        var stepNotSameAsSourceX = sourceHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsSourceX;
-                                        sourceHoleIndex.StepNotSameX = stepNotSameAsSourceX;
-                                        // （暂舍弃 2024-03-18）
-                                        // if (stepNotSameAsSourceX && sourceTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && sourceTemplateConsumableRow == 1)
-                                        // {
-                                        //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                        //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                        // }
-                                    }
-                                    // 如果移液头与耗材行数一致，OriIndex变为所在列Index
-                                    else if (headChannelRow == sourceTemplateConsumableRow)
-                                    {
-                                        sourceHoleIndex.OriIndex = sourceColIndex;
-                                        sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    }
-
-                                    // 特殊处理：如果行距 == 0 或者 行距 >= 移液头行距和，则认为是溶液槽，y不走偏移（2024-05-28）
-                                    if (sourceTemplateConsumableHoleStep.Y == 0 || sourceTemplateConsumableHoleStep.Y >= headChannelRow * tipTemplateConsumableHoleStep.Y)
-                                    {
-                                        sourceHoleIndex.YHoleOffset = 0;
-                                        sourceHoleIndex.StepNotSameY = false;
-                                    }
-                                }
-                            }
-
-                            /**
-                             * 靶孔
-                             */
-                            foreach (var targetHoleIndex in seq.TargetHoleIndexList)
-                            {
-                                // 所在列Index
-                                var targetColIndex = targetHoleIndex.OriIndex / targetTemplateConsumableRow * targetTemplateConsumableRow;
-
-                                /**
-                                * 移液头偏移逻辑：
-                                * ①移液头多列，整列取：X轴偏移
-                                * ②移液头多列，灵活取：X、Y轴偏移
-                                * ③移液头单列，Y轴偏移
-                                */
-                                // 偏移 = 取枪头数目Col - 移液头通道Col
-                                var targetXHoleOffset = takeTipLeft2Right ? tipChannelCol - headChannelCol : 0;
-                                // 偏移 = holeIndex + 取枪头数目Row -（所在列Index + 移液头通道Row）
-                                var targetYHoleOffset = (targetHoleIndex.OriIndex + tipChannelRow - (targetColIndex + headChannelRow)) * yDirectionFactor;
-                                targetHoleIndex.XHoleOffset = targetXHoleOffset;
-                                targetHoleIndex.YHoleOffset = targetYHoleOffset;
-
-                                // 移液头通道间距与耗材间距是否不一致
-                                if (!head.IsVariable)
-                                {
-                                    // 单通道
-                                    if (tipChannelRow == 1)
-                                    {
-                                        // if (targetTemplateConsumableHoleStep.Y != head.ChannelStep)
-                                        targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为列index即可
-                                        if (!targetHoleIndex.StepNotSameX && !targetHoleIndex.StepNotSameY)
-                                            targetHoleIndex.OriIndex = targetColIndex;
-
-                                        // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                        // （暂舍弃 2024-03-18）
-                                        // var stepNotSameAsTargetX = targetHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsTargetX;
-                                        // if (stepNotSameAsTargetX && targetTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && targetTemplateConsumableRow == 1)
-                                        // {
-                                        //     targetHoleIndex.XHoleOffset = 0;
-                                        //     targetHoleIndex.YHoleOffset = 0;
-                                        // }
-                                        // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材row数大于移液头row数，YHoleOffset默认为负数
-                                        if (targetHoleIndex.StepNotSameY && targetTemplateConsumableRow > headChannelRow)
-                                            targetHoleIndex.YHoleOffset = -1;
-                                    }
-                                    // 多通道
-                                    else
-                                    {
-                                        // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                        if (tipChannelRow > targetTemplateConsumableRow)
-                                        {
-                                            var stepNotSameAsTargetX = targetHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsTargetX;
-                                            sourceHoleIndex.StepNotSameX = stepNotSameAsTargetX;
-                                            // （暂舍弃 2024-03-18）
-                                            // if (stepNotSameAsTargetX && targetTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && targetTemplateConsumableRow == 1)
-                                            // {
-                                            //     targetHoleIndex.XHoleOffset = 0;
-                                            //     targetHoleIndex.YHoleOffset = 0;
-                                            // }
-                                        }
-                                        // 如果移液头与耗材行数一致，OriIndex变为所在列Index
-                                        else if (headChannelRow == targetTemplateConsumableRow)
-                                        {
-                                            targetHoleIndex.OriIndex = targetColIndex;
-                                            targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        }
-
-                                        // 特殊处理：如果行距 == 0 或者 行距 >= 移液头行距和，则认为是溶液槽，y不走偏移（2024-05-28）
-                                        if (targetTemplateConsumableHoleStep.Y == 0 || targetTemplateConsumableHoleStep.Y >= headChannelRow * tipTemplateConsumableHoleStep.Y)
-                                        {
-                                            targetHoleIndex.YHoleOffset = 0;
-                                            targetHoleIndex.StepNotSameY = false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // 逐行取
-                        else
-                        {
-                            /**
-                              * 源孔
-                              */
-                            // 所在行Index
-                            var sourceRowIndex = sourceHoleIndex.OriIndex % sourceTemplateConsumableRow;
-                            // 所在列Index
-                            var sourceColIndex = sourceHoleIndex.OriIndex / sourceTemplateConsumableRow;
-
-                            /**
-                            * 移液头偏移逻辑：
-                            * ①移液头多行，整行取：Y轴偏移
-                            * ②移液头多行，灵活取：X、Y轴偏移
-                            * ③移液头单行，X轴偏移
-                            */
-                            // 偏移 = 取枪头数目Col -（移液头通道Col - 所在列Index）
-                            var sourceXHoleOffset = takeTipLeft2Right ? tipChannelCol - (headChannelCol - sourceColIndex) : 0;
-                            // 偏移 = 取枪头数目Row - 移液头通道Row
-                            var sourceYHoleOffset = (tipChannelRow - headChannelRow) * yDirectionFactor;
-                            sourceHoleIndex.XHoleOffset = sourceXHoleOffset;
-                            sourceHoleIndex.YHoleOffset = sourceYHoleOffset;
-
-                            // 移液头通道间距与耗材间距是否不一致
-                            if (!head.IsVariable)
-                            {
-                                // 单通道
-                                if (tipChannelCol == 1)
-                                {
-                                    // if (sourceTemplateConsumableHoleStep.X != head.ChannelStep)
-                                    sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为行index即可
-                                    if (!sourceHoleIndex.StepNotSameX && !sourceHoleIndex.StepNotSameY) 
-                                        sourceHoleIndex.OriIndex = sourceRowIndex;
-                                    // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                    // （暂舍弃 2024-03-18）
-                                    // var stepNotSameAsSourceY = seq.SourceHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsSourceY;
-                                    // if (stepNotSameAsSourceY && sourceTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && sourceTemplateConsumableCol == 1)
-                                    // {
-                                    //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                    //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                    // }
-                                    // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材col数大于移液头col数，XHoleOffset默认为负数
-                                    if (sourceHoleIndex.StepNotSameX && sourceTemplateConsumableCol > headChannelCol)
-                                        sourceHoleIndex.XHoleOffset = -1;
-                                }
-                                // 多通道
-                                else
-                                {
-                                    // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                    if (tipChannelCol > sourceTemplateConsumableCol)
-                                    {
-                                        var stepNotSameAsSourceY = sourceHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsSourceY;
-                                        sourceHoleIndex.StepNotSameY = stepNotSameAsSourceY;
-                                        // （暂舍弃 2024-03-18）
-                                        // if (stepNotSameAsSourceY && sourceTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && sourceTemplateConsumableCol == 1)
-                                        // {
-                                        //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                        //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                        // }
-                                    }
-                                    // 如果移液头与耗材列数一致，OriIndex变为所在行Index
-                                    else if (headChannelCol == sourceTemplateConsumableCol)
-                                    {
-                                        sourceHoleIndex.OriIndex = sourceRowIndex;
-                                        sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    }
-
-                                    // 特殊处理：如果列距 == 0 或者 列距 >= 移液头列距和，则认为是溶液槽，x不走偏移（2024-05-28）
-                                    if (sourceTemplateConsumableHoleStep.X == 0 || sourceTemplateConsumableHoleStep.X >= headChannelCol * tipTemplateConsumableHoleStep.X)
-                                    {
-                                        sourceHoleIndex.XHoleOffset = 0;
-                                        sourceHoleIndex.StepNotSameX = false;
-                                    }
-                                }
-                            }
-
-                            /**
-                             * 靶孔
-                             */
-                            foreach (var targetHoleIndex in seq.TargetHoleIndexList)
-                            {
-                                // 所在行Index
-                                var targetRowIndex = targetHoleIndex.OriIndex % targetTemplateConsumableRow;
-                                // 所在列Index
-                                var targetColIndex = targetHoleIndex.OriIndex / targetTemplateConsumableRow;
-
-                                /**
-                                * 移液头偏移逻辑：
-                                * ①移液头多行，但整行取：Y轴偏移
-                                * ②移液头多行，但灵活列取：X、Y轴偏移
-                                * ③移液头单行，X轴偏移
-                                */
-                                // 偏移 = 取枪头数目Col -（移液头通道Col - 所在列Index）
-                                var targetXHoleOffset = takeTipLeft2Right ? tipChannelCol - (headChannelCol - targetColIndex) : 0;
-                                // 偏移 = 取枪头数目Row - 移液头通道Row
-                                var targetYHoleOffset = (tipChannelRow - headChannelRow) * yDirectionFactor;
-                                targetHoleIndex.XHoleOffset = targetXHoleOffset;
-                                targetHoleIndex.YHoleOffset = targetYHoleOffset;
-
-                                // 移液头通道间距与耗材间距是否不一致
-                                if (!head.IsVariable)
-                                {
-                                    // 单通道
-                                    if (tipChannelCol == 1)
-                                    {
-                                        // if (targetTemplateConsumableHoleStep.X != head.ChannelStep)
-                                        targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为行index即可
-                                        if (!targetHoleIndex.StepNotSameX && !targetHoleIndex.StepNotSameY)
-                                            targetHoleIndex.OriIndex = targetRowIndex;
-                                        // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                        // （暂舍弃 2024-03-18）
-                                        // var stepNotSameAsTargetY = targetHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsTargetY;
-                                        // if (stepNotSameAsTargetY && targetTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && targetTemplateConsumableCol == 1)
-                                        // {
-                                        //     targetHoleIndex.XHoleOffset = 0;
-                                        //     targetHoleIndex.YHoleOffset = 0;
-                                        // }
-                                        // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材col数大于移液头col数，XHoleOffset默认为负数
-                                        if (targetHoleIndex.StepNotSameX && targetTemplateConsumableCol > headChannelCol)
-                                            targetHoleIndex.XHoleOffset = -1;
-                                    }
-                                    // 多通道
-                                    else
-                                    {
-                                        // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                        if (tipChannelCol > targetTemplateConsumableCol)
-                                        {
-                                            var stepNotSameAsTargetY = targetHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsTargetY;
-                                            targetHoleIndex.StepNotSameY = stepNotSameAsTargetY;
-                                            // （暂舍弃 2024-03-18）
-                                            // if (stepNotSameAsTargetY && targetTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && targetTemplateConsumableCol == 1)
-                                            // {
-                                            //     targetHoleIndex.XHoleOffset = 0;
-                                            //     targetHoleIndex.YHoleOffset = 0;
-                                            // }
-                                        }
-                                        // 如果移液头与耗材列数一致，OriIndex变为所在行Index
-                                        else if (headChannelCol == targetTemplateConsumableCol)
-                                        {
-                                            targetHoleIndex.OriIndex = targetRowIndex;
-                                            targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        }
-
-                                        // 特殊处理：如果列距 == 0 或者 列距 >= 移液头列距和，则认为是溶液槽，x不走偏移（2024-05-28）
-                                        if (targetTemplateConsumableHoleStep.X == 0 || targetTemplateConsumableHoleStep.X >= headChannelCol * tipTemplateConsumableHoleStep.X)
-                                        {
-                                            targetHoleIndex.XHoleOffset = 0;
-                                            targetHoleIndex.StepNotSameX = false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // A1左下
-                    else
-                    {
-                        // 逐列取
-                        if (takeTipEachCol)
-                        {
-                            /**
-                              * 源孔
-                              */
-                            // 所在行Index
-                            var sourceRowIndex = sourceHoleIndex.OriIndex / sourceTemplateConsumableCol;
-                            // 所在列Index
-                            var sourceColIndex = sourceHoleIndex.OriIndex % sourceTemplateConsumableCol;
-
-                            /**
-                            * 移液头偏移逻辑：
-                            * ①移液头多列，整列取：X轴偏移
-                            * ②移液头多列，灵活取：X、Y轴偏移
-                            * ③移液头单列，Y轴偏移
-                            */
-                            // 偏移 = 取枪头数目Col - 移液头通道Col
-                            var sourceXHoleOffset = takeTipLeft2Right ? tipChannelCol - headChannelCol : 0;
-                            // 偏移 = 取枪头数目Row -（移液头通道Row - 所在行Index）
-                            var sourceYHoleOffset = (headChannelRow - sourceRowIndex - tipChannelRow) * yDirectionFactor;
-                            sourceHoleIndex.XHoleOffset = sourceXHoleOffset;
-                            sourceHoleIndex.YHoleOffset = sourceYHoleOffset;
-
-                            // 移液头通道间距与耗材间距是否不一致
-                            if (!head.IsVariable)
-                            {
-                                // 单通道
-                                if (tipChannelRow == 1)
-                                {
-                                    // if (sourceTemplateConsumableHoleStep.Y != head.ChannelStep)
-                                    sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为列index即可
-                                    if (!sourceHoleIndex.StepNotSameX && !sourceHoleIndex.StepNotSameY)
-                                        sourceHoleIndex.OriIndex = sourceColIndex;
-                                    // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                    // （暂舍弃 2024-03-18）
-                                    // var stepNotSameAsSourceX = seq.SourceHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsSourceX;
-                                    // if (stepNotSameAsSourceX && sourceTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && sourceTemplateConsumableRow == 1)
-                                    // {
-                                    //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                    //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                    // }
-                                    // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材row数大于移液头row数，YHoleOffset默认为负数
-                                    if (sourceHoleIndex.StepNotSameY && sourceTemplateConsumableRow > headChannelRow)
-                                        sourceHoleIndex.YHoleOffset = -1;
-                                }
-                                // 多通道
-                                else
-                                {
-                                    // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                    if (tipChannelRow > sourceTemplateConsumableRow)
-                                    {
-                                        var stepNotSameAsSourceX = sourceHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsSourceX;
-                                        sourceHoleIndex.StepNotSameX = stepNotSameAsSourceX;
-                                        // （暂舍弃 2024-03-18）
-                                        // if (stepNotSameAsSourceX && sourceTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && sourceTemplateConsumableRow == 1)
-                                        // {
-                                        //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                        //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                        // }
-                                    }
-                                    // 如果移液头与耗材行数一致，OriIndex变为所在列Index
-                                    else if (headChannelRow == sourceTemplateConsumableRow)
-                                    {
-                                        sourceHoleIndex.OriIndex = sourceColIndex;
-                                        sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    }
-
-                                    // 特殊处理：如果行距 == 0 或者 行距 >= 移液头行距和，则认为是溶液槽，y不走偏移（2024-05-28）
-                                    if (sourceTemplateConsumableHoleStep.Y == 0 || sourceTemplateConsumableHoleStep.Y >= headChannelRow * tipTemplateConsumableHoleStep.Y)
-                                    {
-                                        sourceHoleIndex.YHoleOffset = 0;
-                                        sourceHoleIndex.StepNotSameY = false;
-                                    }
-                                }
-                            }
-
-                            /**
-                             * 靶孔
-                             */
-                            foreach (var targetHoleIndex in seq.TargetHoleIndexList)
-                            {
-                                // 所在行Index
-                                var targetRowIndex = targetHoleIndex.OriIndex / targetTemplateConsumableCol;
-                                // 所在列Index
-                                var targetColIndex = targetHoleIndex.OriIndex % targetTemplateConsumableCol;
-
-                                /**
-                                * 移液头偏移逻辑：
-                                * ①移液头多列，整列取：X轴偏移
-                                * ②移液头多列，灵活取：X、Y轴偏移
-                                * ③移液头单列，Y轴偏移
-                                */
-                                // 偏移 = 取枪头数目Col - 移液头通道Col
-                                var targetXHoleOffset = takeTipLeft2Right ? tipChannelCol - headChannelCol : 0;
-                                // 偏移 = 取枪头数目Row -（移液头通道Row - 所在行Index）
-                                var targetYHoleOffset = (headChannelRow - targetRowIndex - tipChannelRow) * yDirectionFactor;
-                                targetHoleIndex.XHoleOffset = targetXHoleOffset;
-                                targetHoleIndex.YHoleOffset = targetYHoleOffset;
-
-                                // 移液头通道间距与耗材间距是否不一致
-                                if (!head.IsVariable)
-                                {
-                                    // 单通道
-                                    if (tipChannelRow == 1)
-                                    {
-                                        // if (targetTemplateConsumableHoleStep.Y != head.ChannelStep)
-                                        targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        // 特殊处理：2025-10-18， StepNotSameX和StepNotSameY均为false，则认为间距一致，OriIndex置为列index即可
-                                        if (!targetHoleIndex.StepNotSameX && !targetHoleIndex.StepNotSameY)
-                                            targetHoleIndex.OriIndex = targetColIndex;
-                                        // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                        // （暂舍弃 2024-03-18）
-                                        // var stepNotSameAsTargetX = targetHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsTargetX;
-                                        // if (stepNotSameAsTargetX && targetTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && targetTemplateConsumableRow == 1)
-                                        // {
-                                        //     targetHoleIndex.XHoleOffset = 0;
-                                        //     targetHoleIndex.YHoleOffset = 0;
-                                        // }
-                                        // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材row数大于移液头row数，YHoleOffset默认为负数
-                                        if (targetHoleIndex.StepNotSameY && targetTemplateConsumableRow > headChannelRow)
-                                            targetHoleIndex.YHoleOffset = -1;
-                                    }
-                                    // 多通道
-                                    else
-                                    {
-                                        // 特殊处理：例如溶液槽x孔距比移液头x孔距大，默认走到溶液槽A1，不走偏移
-                                        if (tipChannelRow > targetTemplateConsumableRow)
-                                        {
-                                            var stepNotSameAsTargetX = targetHoleIndex.XHoleOffset != 0 && tipHoleStepNotSameAsTargetX;
-                                            sourceHoleIndex.StepNotSameX = stepNotSameAsTargetX;
-                                            // （暂舍弃 2024-03-18）
-                                            // if (stepNotSameAsTargetX && targetTemplateConsumableHoleStep.X > tipTemplateConsumableHoleStep.X && targetTemplateConsumableRow == 1)
-                                            // {
-                                            //     targetHoleIndex.XHoleOffset = 0;
-                                            //     targetHoleIndex.YHoleOffset = 0;
-                                            // }
-                                        }
-                                        // 如果移液头与耗材行数一致，OriIndex变为所在列Index
-                                        else if (headChannelRow == targetTemplateConsumableRow)
-                                        {
-                                            targetHoleIndex.OriIndex = targetColIndex;
-                                            targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        }
-
-                                        // 特殊处理：如果行距 == 0 或者 行距 >= 移液头行距和，则认为是溶液槽，y不走偏移（2024-05-28）
-                                        if (targetTemplateConsumableHoleStep.Y == 0 || targetTemplateConsumableHoleStep.Y >= headChannelRow * tipTemplateConsumableHoleStep.Y)
-                                        {
-                                            targetHoleIndex.YHoleOffset = 0;
-                                            targetHoleIndex.StepNotSameY = false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // 逐行取
-                        else
-                        {
-                            /**
-                             * 源孔
-                             */
-                            // 所在行首孔Index
-                            var sourceRowFirstIndex = sourceHoleIndex.OriIndex / sourceTemplateConsumableCol * sourceTemplateConsumableCol;
-                            // 所在列Index
-                            var sourceColIndex = sourceHoleIndex.OriIndex % sourceTemplateConsumableCol;
-
-                            /**
-                            * 移液头偏移逻辑：
-                            * ①移液头多行，整行取：Y轴偏移
-                            * ②移液头多行，灵活取：X、Y轴偏移
-                            * ③移液头单行，X轴偏移
-                            */
-                            // 偏移 = 所在列index + 取枪头数目Col - 移液头通道Col
-                            var sourceXHoleOffset = takeTipLeft2Right ? sourceColIndex + tipChannelCol - headChannelCol : 0;
-                            // 偏移 = 移液头通道Row - 取枪头数目Row
-                            var sourceYHoleOffset = (headChannelRow - tipChannelRow) * yDirectionFactor;
-                            sourceHoleIndex.XHoleOffset = sourceXHoleOffset;
-                            sourceHoleIndex.YHoleOffset = sourceYHoleOffset;
-
-                            // 移液头通道间距与耗材间距是否不一致
-                            if (!head.IsVariable)
-                            {
-                                // 单通道
-                                if (tipChannelCol == 1)
-                                {
-                                    // if (sourceTemplateConsumableHoleStep.X != head.ChannelStep)
-                                    sourceHoleIndex.StepNotSameX = tipHoleStepNotSameAsSourceX;
-                                    sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    // if (!sourceHoleIndex.StepNotSameX || !sourceHoleIndex.StepNotSameY)
-                                    //     sourceHoleIndex.OriIndex = sourceRowFirstIndex;
-
-                                    // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                    // （暂舍弃 2024-03-18）
-                                    // var stepNotSameAsSourceY = seq.SourceHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsSourceY;
-                                    // if (stepNotSameAsSourceY && sourceTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && sourceTemplateConsumableCol == 1)
-                                    // {
-                                    //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                    //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                    // }
-                                    // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材col数大于移液头col数，XHoleOffset默认为负数
-                                    if (sourceHoleIndex.StepNotSameX && sourceTemplateConsumableCol > headChannelCol)
-                                        sourceHoleIndex.XHoleOffset = -1;
-                                }
-                                // 多通道
-                                else
-                                {
-                                    // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                    if (tipChannelCol > sourceTemplateConsumableCol)
-                                    {
-                                        var stepNotSameAsSourceY = sourceHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsSourceY;
-                                        sourceHoleIndex.StepNotSameY = stepNotSameAsSourceY;
-                                        // （暂舍弃 2024-03-18）
-                                        // if (stepNotSameAsSourceY && sourceTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && sourceTemplateConsumableCol == 1)
-                                        // {
-                                        //     seq.SourceHoleIndex.XHoleOffset = 0;
-                                        //     seq.SourceHoleIndex.YHoleOffset = 0;
-                                        // }
-                                    }
-                                    // 如果移液头与耗材列数一致，OriIndex变为所在行Index
-                                    else if (headChannelCol == sourceTemplateConsumableCol)
-                                    {
-                                        sourceHoleIndex.OriIndex = sourceRowFirstIndex;
-                                        sourceHoleIndex.StepNotSameY = tipHoleStepNotSameAsSourceY;
-                                    }
-
-                                    // 特殊处理：如果列距 == 0 或者 列距 >= 移液头列距和，则认为是溶液槽，x不走偏移（2024-05-28）
-                                    if (sourceTemplateConsumableHoleStep.X == 0 || sourceTemplateConsumableHoleStep.X >= headChannelCol * tipTemplateConsumableHoleStep.X)
-                                    {
-                                        sourceHoleIndex.XHoleOffset = 0;
-                                        sourceHoleIndex.StepNotSameX = false;
-                                    }
-                                }
-                            }
-
-                            /**
-                             * 靶孔
-                             */
-                            foreach (var targetHoleIndex in seq.TargetHoleIndexList)
-                            {
-                                // 所在行首孔Index
-                                var targetRowFirstIndex = targetHoleIndex.OriIndex / targetTemplateConsumableCol * targetTemplateConsumableCol;
-                                // 所在列ndex
-                                var targetColIndex = targetHoleIndex.OriIndex % targetTemplateConsumableCol;
-
-                                /**
-                                * 移液头偏移逻辑：
-                                * ①移液头多行，整行取：Y轴偏移
-                                * ②移液头多行，灵活取：X、Y轴偏移
-                                * ③移液头单行，X轴偏移
-                                */
-                                // 偏移 = 所在列index + 取枪头数目Col - 移液头通道Col
-                                var targetXHoleOffset = takeTipLeft2Right ? targetColIndex + tipChannelCol - headChannelCol : 0;
-                                // 偏移 = 移液头通道Row - 取枪头数目Row
-                                var targetYHoleOffset = (headChannelRow - tipChannelRow) * yDirectionFactor;
-                                targetHoleIndex.XHoleOffset = targetXHoleOffset;
-                                targetHoleIndex.YHoleOffset = targetYHoleOffset;
-
-                                // 移液头通道间距与耗材间距是否不一致
-                                if (!head.IsVariable)
-                                {
-                                    // 单通道
-                                    if (tipChannelCol == 1)
-                                    {
-                                        // if (targetTemplateConsumableHoleStep.X != head.ChannelStep)
-                                        targetHoleIndex.StepNotSameX = tipHoleStepNotSameAsTargetX;
-                                        targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        // if (!targetHoleIndex.StepNotSameX || !targetHoleIndex.StepNotSameY)
-                                        //     targetHoleIndex.OriIndex = targetRowFirstIndex;
-
-                                        // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                        // （暂舍弃 2024-03-18）
-                                        // var stepNotSameAsTargetY = targetHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsTargetY;
-                                        // if (stepNotSameAsTargetY && targetTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && targetTemplateConsumableCol == 1)
-                                        // {
-                                        //     targetHoleIndex.XHoleOffset = 0;
-                                        //     targetHoleIndex.YHoleOffset = 0;
-                                        // }
-                                        // 特殊处理： 移液头通道间距与耗材间距不一致下，耗材col数大于移液头col数，XHoleOffset默认为负数
-                                        if (targetHoleIndex.StepNotSameX && targetTemplateConsumableCol > headChannelCol)
-                                            targetHoleIndex.XHoleOffset = -1;
-                                    }
-                                    // 多通道
-                                    else
-                                    {
-                                        // 特殊处理：例如溶液槽y孔距比移液头y孔距大，默认走到溶液槽A1，不走偏移
-                                        if (tipChannelCol > targetTemplateConsumableCol)
-                                        {
-                                            var stepNotSameAsTargetY = targetHoleIndex.YHoleOffset != 0 && tipHoleStepNotSameAsTargetY;
-                                            targetHoleIndex.StepNotSameY = stepNotSameAsTargetY;
-                                            // （暂舍弃 2024-03-18）
-                                            // if (stepNotSameAsTargetY && targetTemplateConsumableHoleStep.Y > tipTemplateConsumableHoleStep.Y && targetTemplateConsumableCol == 1)
-                                            // {
-                                            //     targetHoleIndex.XHoleOffset = 0;
-                                            //     targetHoleIndex.YHoleOffset = 0;
-                                            // }
-                                        }
-                                        // 如果移液头与耗材列数一致，OriIndex变为所在行Index
-                                        else if (headChannelCol == targetTemplateConsumableCol)
-                                        {
-                                            targetHoleIndex.OriIndex = targetRowFirstIndex;
-                                            targetHoleIndex.StepNotSameY = tipHoleStepNotSameAsTargetY;
-                                        }
-
-                                        // 特殊处理：如果列距 == 0 或者 列距 >= 移液头列距和，则认为是溶液槽，x不走偏移（2024-05-28）
-                                        if (targetTemplateConsumableHoleStep.X == 0 || targetTemplateConsumableHoleStep.X >= headChannelCol * tipTemplateConsumableHoleStep.X)
-                                        {
-                                            targetHoleIndex.XHoleOffset = 0;
-                                            targetHoleIndex.StepNotSameX = false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 分配退枪头信息
-        /// </summary>
-        private void AllocateReleaseTipInfo()
-        {
-            /**
-             * 是否退枪头
-             */
-            for (var i = 0; i < seqList.Count; i++)
-            {
-                // 当前Seq
-                var seqCurrent = seqList[i];
-
-                if (seqCurrent.IsCmdOnly || seqCurrent.IsPumpLiquid)
-                    continue;
-
-                // 下一个Seq
-                var seqNext = i == seqList.Count - 1 ? null : seqList.ElementAt(i + 1);
-                // 特殊指令
-                var cmd = seqCurrent.Cmd.ToLower();
-                // 最后一个移液信息完成后是否退枪头
-                var lastSeqReleaseTip = !(seqNext == null && cmd.Contains(AutoLiquid_Library.Utils.ConstantsUtils.NoReleaseTipCmd.ToLower()));
-                // 是否强制退枪头
-                var seqReleaseTip = cmd.Contains(AutoLiquid_Library.Utils.ConstantsUtils.ReleaseTipCmd.ToLower()) && !cmd.Contains(AutoLiquid_Library.Utils.ConstantsUtils.NoReleaseTipCmd.ToLower());
-
-                //var isReleaseTip = seqReleaseTip || (seqNext == null && lastSeqReleaseTip) || (seqNext != null && seqNext.IsTakeTip && seqCurrent.IsTakeTip);
-                var isReleaseTip = seqReleaseTip || (seqNext == null && lastSeqReleaseTip) || (seqNext != null && seqNext.IsTakeTip);
-                seqList[i].IsReleaseTip = isReleaseTip;
-            }
-
-            /**
-             * 移液头分配退枪头位置
-             */
-            for (var headIndex = 0; headIndex < ParamsHelper.HeadList.Count; headIndex++)
-            {
-                // 需要退枪头的seq列表
-                var seqListUsedHead = seqList.Where(p => p.HeadUsedIndex == headIndex && p.IsReleaseTip).ToList();
-                // 退枪头位置可用Index列表
-                var releaseTipPosAvailableIndexList = new List<int>();
-                for (var i = 0; i < ParamsHelper.CommonSettingList[headIndex].ReleaseTipPosAvailableList.Count; i++)
-                {
-                    if (ParamsHelper.CommonSettingList[headIndex].ReleaseTipPosAvailableList[i])
-                        releaseTipPosAvailableIndexList.Add(i);
-                }
-                // 退枪头位置可用数目
-                var releaseTipPosAvailableCount = releaseTipPosAvailableIndexList.Count;
-
-                if (releaseTipPosAvailableCount > 1)
-                {
-                    // 把seqListUsedHead拆分成可用退枪头位置数目
-                    /**
-                     * 拆分规则：
-                     * seqListUsedHead / releaseTipPosAvailableCount是否有余数，没有余数，看①；有余数，看②
-                     * ①seqListUsedHead 拆分成 releaseTipPosAvailableCount 个子List<Seq>
-                     * ②seqListUsedHead 拆分成 ( releaseTipPosAvailableCount - 1) 个List<Seq>，然后余数为一个新的List<Seq>
-                     */
-                    var splitSize = seqListUsedHead.Count / releaseTipPosAvailableCount;
-                    var splitRemain = seqListUsedHead.Count % releaseTipPosAvailableCount;
-                    List<List<Seq>> seqSplitList;
-                    if (splitRemain == 0)
-                    {
-                        seqSplitList = ObjectUtils.SplitList(seqListUsedHead, splitSize);
-                    }
-                    else
-                    {
-                        // “被除数”补全到能让“除数”整除，让拆分更完整
-                        splitSize = (seqListUsedHead.Count + (releaseTipPosAvailableCount - splitRemain)) / releaseTipPosAvailableCount;
-                        seqSplitList = ObjectUtils.SplitList(seqListUsedHead, splitSize);
-                    }
-
-                    for (var i = 0; i < seqSplitList.Count; i++)
-                    {
-                        var seqList = seqSplitList.ElementAt(i);
-                        foreach (var seq in seqList)
-                        {
-                            seq.ReleaseTipPosIndex = releaseTipPosAvailableIndexList[i];
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 执行
-        /// </summary>
-        /// <param name="replaceTipOverRange">超过量程分液是否换枪头</param>
-        private void TakeAction(bool replaceTipOverRange)
-        {
-            // 每个seq占全部seqList的百分比
-            double percentEachSeq = 100.0 / seqList.Count;
+            // 每个seq占全部thisRoundSeqList的百分比
+            double percentEachSeq = 100.0 / thisRoundSeqList.Count;
             // 每完成一步增加的百分比（4个基本动作：取枪头、吸液、喷液、退枪头）
             double percentEachStep = percentEachSeq / 4;
             // 每个seq运行所需时间（默认30s，通过不断计算刷新本值）
@@ -2838,12 +1129,12 @@ namespace AutoLiquid_GenScript_Single_Handling
             // 重复次数计数器
             var repeatTick = 0;
 
-            for (var i = 0; i < seqList.Count; i++)
+            for (var i = 0; i < thisRoundSeqList.Count; i++)
             {
                 // 当前移液信息
-                var seq = seqList.ElementAt(i);
+                var seq = thisRoundSeqList.ElementAt(i);
                 // 下一个移液信息
-                var seqNext = i == seqList.Count - 1 ? null : seqList.ElementAt(i + 1);
+                var seqNext = i == thisRoundSeqList.Count - 1 ? null : thisRoundSeqList.ElementAt(i + 1);
 
                 // 确保WAIT特殊指令能暂停
                 CmdHelper.ManualStop(false);
@@ -2875,7 +1166,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                 Dispatcher.Invoke(() =>
                 {
                     // 第一个Seq默认给30s倒计时
-                    var totalTimeNeed = timeNeedEachSeq * (seqList.Count - i);
+                    var totalTimeNeed = timeNeedEachSeq * (thisRoundSeqList.Count - i);
                     this.ControlProgressBar.UpdateTimeRemain(totalTimeNeed);
                 });
 
@@ -3311,6 +1602,589 @@ namespace AutoLiquid_GenScript_Single_Handling
         }
 
         /// <summary>
+        /// 导入文档
+        /// </summary>
+        private void ShowImportDialog()
+        {
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Filter = "Excel Files|*.xls;*.xlsx;*.xlsm";
+            var result = dialog.ShowDialog();
+            if (result == true)
+            {
+                // 导入excel
+                excelFilesNameImported = dialog.SafeFileName;
+                ImportExcel(dialog.FileName);
+            }
+        }
+
+        /// <summary>
+        /// 导入Excel
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        private void ImportExcel(string filePath)
+        {
+            // 解析excel数据
+            this.LayoutImportLoading.Visibility = Visibility.Visible;
+            BackgroundProcess.RunAsync(() => ParseDataFromExcel(filePath), delegate (object returnResult)
+            {
+                this.LayoutImportLoading.Visibility = Visibility.Collapsed;
+                if ((bool)returnResult)
+                {
+                    MessageBox.Show((string)this.FindResource("Prompt_Import_Success"));
+                }
+                else
+                {
+                    MessageBox.Show((string)this.FindResource("Prompt_Import_Error"));
+                }
+            });
+        }
+
+        /// <summary>
+        /// 解析Excel数据（新模板：B~H列）
+        /// 列映射：B=源盘名, C=源盘类型, D=源位置, E=靶盘名, F=靶盘类型, G=靶位置, H=体积
+        /// </summary>
+        /// <summary>
+        /// 解析Excel数据（新模板：B~H列，第2行起数据）
+        /// B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
+        /// </summary>
+        private bool ParseDataFromExcel(string filePath)
+        {
+            using (Workbook workbook = new Workbook())
+            {
+                try { workbook.LoadFromFile(filePath); }
+                catch (Exception e)
+                {
+                    MessageBox.Show((string)this.FindResource("Prompt_Pls_Close_Excel_File_First"));
+                    LogHelper.Error(e.StackTrace);
+                    return false;
+                }
+
+                Worksheet ws;
+                try { ws = workbook.Worksheets[0]; }
+                catch (Exception ex)
+                {
+                    MessageBox.Show((string)this.FindResource("Prompt_Excel_Must_Be_Xlsx_File_Or_File_Destroy"));
+                    LogHelper.Error(ex.StackTrace);
+                    return false;
+                }
+
+                seqList.Clear();
+
+                // ── 新Excel列常量（1-based）──
+                const int srcLabelCol = 2;  // B: Source Labware Label（源盘耗材名）
+                const int srcTypeCol = 3;  // C: Source Labware Type（源盘耗材类型）
+                const int srcPosCol = 4;  // D: Source Position（源位置序号，横向1-based）
+                const int dstLabelCol = 5;  // E: Destination Labware Label（靶盘耗材名）
+                const int dstTypeCol = 6;  // F: Destination Labware Type（靶盘耗材类型）
+                const int dstPosCol = 7;  // G: Destination Position（靶位置序号）
+                const int volumeCol = 8;  // H: Volume（体积）
+
+                // ── 盘面布局（可扩展：仅修改下列两行即可调整枪头盒候选位）──
+                // 最左列盘位index，按需动态分配枪头盒，最多占满
+                var tipTemplateIndexCandidates = new List<int> { 0, 4, 8, 12 }; // 可扩展
+                 int totalTemplateCount = ParamsHelper.Layout.ColCount * ParamsHelper.Layout.RowCount; // 盘面数目
+                 const int headUsedIndex = 0; // 单移液头
+                var a1Pos = ParamsHelper.CommonSettingList[headUsedIndex].A1Pos;
+
+                // 枪头盒耗材（取第一个 IsTipBox=true）
+                var tipTemplateConsumableType = ParamsHelper.CommonSettingList[headUsedIndex]
+                    .Consumables.FirstOrDefault(c => c.IsTipBox);
+                if (tipTemplateConsumableType == null)
+                {
+                    Dispatcher.Invoke(() => MessageBox.Show(
+                        (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+                    return false;
+                }
+                int tipBoxCapacity = tipTemplateConsumableType.RowCount * tipTemplateConsumableType.ColCount;
+
+                // ── 第一遍：收集所有有效数据行 ──
+                var dataRows = new List<(int row, string srcLabel, string srcType,
+                    int srcPos, string dstLabel, string dstType, int dstPos, decimal volume)>();
+                for (int r = 2; ; r++)
+                {
+                    var srcLabel = ws.Range[r, srcLabelCol].Text?.Trim() ?? "";
+                    var dstLabel = ws.Range[r, dstLabelCol].Text?.Trim() ?? "";
+                    if (string.IsNullOrEmpty(srcLabel) && string.IsNullOrEmpty(dstLabel)) break;
+                    if (string.IsNullOrEmpty(srcLabel) || string.IsNullOrEmpty(dstLabel)) continue;
+
+                    var srcPosStr = ws.Range[r, srcPosCol].Value?.Trim() ?? "";
+                    var dstPosStr = ws.Range[r, dstPosCol].Value?.Trim() ?? "";
+                    var volStr = ws.Range[r, volumeCol].Value?.Trim() ?? "";
+                    if (string.IsNullOrEmpty(srcPosStr) || string.IsNullOrEmpty(dstPosStr) || string.IsNullOrEmpty(volStr))
+                        continue;
+
+                    var srcType = ws.Range[r, srcTypeCol].Text?.Trim() ?? "";
+                    var dstType = ws.Range[r, dstTypeCol].Text?.Trim() ?? "";
+                    dataRows.Add((r, srcLabel, srcType,
+                        int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
+                }
+
+                if (dataRows.Count == 0)
+                {
+                    Dispatcher.Invoke(() => MessageBox.Show(
+                        (string)this.FindResource("Prompt_Import_Excel_Must_Not_Be_Empty")));
+                    return false;
+                }
+
+                // ── 动态分配轮次与盘位 ──
+                // 每行对应一个round和盘位映射（源盘名/靶盘名 → TipTemplateIndex）
+                // 轮次规则：
+                //   - 当前轮维护：已分配的plate集合（源盘名+靶盘名 union）、已用枪头数、已分配盘位
+                //   - 枪头盒数 = ceil(本轮行数 / tipBoxCapacity)，最多 tipTemplateIndexCandidates.Count 个
+                //   - 当加入本行后，所需枪头盒数+板数 > totalTemplateCount，则开启新轮次
+
+                // 分轮结果：rowRound[i] = 第i行的轮次(1-based)
+                // 每轮的 plate→盘位index 映射
+                var rowRound = new int[dataRows.Count];
+                // 每轮的 plate→盘位index 映射（盘名→盘位index，不含枪头盒盘位）
+                var roundPlateTemplateIndexMap = new List<Dictionary<string, int>>();
+                // 每轮枪头盒的盘位index列表
+                var roundTipTemplateIndexList = new List<List<int>>();
+
+                // 当前轮状态
+                int currentRound = 1;
+                var currentRoundPlates = new List<string>();     // 本轮不重复盘名（有序）
+                var currentRoundRows = new List<int>();        // 本轮dataRows的下标
+                // 枪头盒候选位中已分配的index（跨轮累计，后续轮次优先补充枪头盒）
+                int globalTipCandidateUsed = 0;
+
+                // 辅助：计算本轮需要的枪头盒数（本轮行数 / tipBoxCapacity 向上取整，且不超过候选数）
+                Func<int, int> calcTipBoxCount = (rowCount) =>
+                    Math.Min(tipTemplateIndexCandidates.Count,
+                             (rowCount + tipBoxCapacity - 1) / tipBoxCapacity);
+
+                // 辅助：提交当前轮（生成映射后压入结果列表）
+                Action commitRound = () =>
+                {
+                    // 本轮枪头盒数量
+                    int tipCount = calcTipBoxCount(currentRoundRows.Count);
+                    // 枪头盒盘位index列表（从候选位中依次取，全局累积）
+                    var tipIndexList = new List<int>();
+                    for (int k = 0; k < tipCount; k++)
+                    {
+                        int candidateIdx = globalTipCandidateUsed % tipTemplateIndexCandidates.Count;
+                        tipIndexList.Add(tipTemplateIndexCandidates[candidateIdx]);
+                        globalTipCandidateUsed++;
+                    }
+
+                    // 剩余盘位（排除枪头盒占用的盘位）
+                    var availablePlateTemplateIndexList = Enumerable.Range(0, totalTemplateCount)
+                        .Except(tipIndexList)
+                        .ToList();
+
+                    // 按出现顺序分配盘位
+                    var plateMap = new Dictionary<string, int>();
+                    for (int k = 0; k < currentRoundPlates.Count; k++)
+                        plateMap[currentRoundPlates[k]] = availablePlateTemplateIndexList[k];
+
+                    // 给本轮每行打上round编号
+                    foreach (var ri in currentRoundRows)
+                        rowRound[ri] = currentRound;
+
+                    roundPlateTemplateIndexMap.Add(plateMap);
+                    roundTipTemplateIndexList.Add(tipIndexList);
+                };
+
+                for (int i = 0; i < dataRows.Count; i++)
+                {
+                    var row = dataRows[i];
+
+                    // 本行需要的新盘名
+                    var newPlates = new List<string>();
+                    if (!currentRoundPlates.Contains(row.srcLabel)) newPlates.Add(row.srcLabel);
+                    if (!currentRoundPlates.Contains(row.dstLabel) && row.dstLabel != row.srcLabel
+                        && !newPlates.Contains(row.dstLabel)) newPlates.Add(row.dstLabel);
+
+                    // 预测加入本行后所需的枪头盒数和总盘位数
+                    int predictedPlateCount = currentRoundPlates.Count + newPlates.Count;
+                    int predictedTipCount = calcTipBoxCount(currentRoundRows.Count + 1);
+                    int predictedTotal = predictedPlateCount + predictedTipCount;
+
+                    if (predictedTotal > totalTemplateCount && currentRoundRows.Count > 0)
+                    {
+                        // 当前行放不下，提交本轮，开启新轮
+                        commitRound();
+                        currentRound++;
+                        currentRoundPlates = new List<string>();
+                        currentRoundRows = new List<int>();
+                        globalTipCandidateUsed = 0; // 每轮枪头盒从候选位重新开始排列
+
+                        // 重新计算新盘名
+                        newPlates.Clear();
+                        if (!currentRoundPlates.Contains(row.srcLabel)) newPlates.Add(row.srcLabel);
+                        if (!currentRoundPlates.Contains(row.dstLabel) && row.dstLabel != row.srcLabel
+                            && !newPlates.Contains(row.dstLabel)) newPlates.Add(row.dstLabel);
+                    }
+
+                    currentRoundPlates.AddRange(newPlates);
+                    currentRoundRows.Add(i);
+                }
+                // 提交最后一轮
+                if (currentRoundRows.Count > 0)
+                    commitRound();
+
+                int maxRound = currentRound;
+
+                // ── 第二遍：逐行生成 Seq ──
+                int dataRowIndex = 0;
+                foreach (var row in dataRows)
+                {
+                    try
+                    {
+                        int round = rowRound[dataRowIndex++];
+                        var plateMap = roundPlateTemplateIndexMap[round - 1];
+                        var tipIndexList = roundTipTemplateIndexList[round - 1];
+                        // 本轮使用第一个枪头盒盘位（多个枪头盒时TakeAction会自动按顺序取）
+                        int tipTemplateIndex = tipIndexList[0];
+
+                        // 解析耗材类型
+                        var srcConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.srcType, false);
+                        if (srcConsumableType == null)
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+                            return false;
+                        }
+                        var dstConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.dstType, false);
+                        if (dstConsumableType == null)
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+                            return false;
+                        }
+
+                        // 获取盘位index
+                        int sourceTemplateIndex = plateMap[row.srcLabel];
+                        int targetTemplateIndex = plateMap[row.dstLabel];
+
+                        // 验证盘位是否已在耗材设置中启用
+                        if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                                + srcConsumableType.GroupName
+                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                                + (sourceTemplateIndex + 1)));
+                            return false;
+                        }
+                        if (!dstConsumableType.TemplateAvailableList[targetTemplateIndex])
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                                + dstConsumableType.GroupName
+                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                                + (targetTemplateIndex + 1)));
+                            return false;
+                        }
+                        if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                                + tipTemplateConsumableType.GroupName
+                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                                + (tipTemplateIndex + 1)));
+                            return false;
+                        }
+
+                        // 位置序号（横向1-based）→ 孔位字符串 → HoleIndex
+                        var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType,
+                                ConsumableHelper.GetHolePosStr(row.srcPos - 1, srcConsumableType.RowCount, srcConsumableType.ColCount, a1Pos, true));
+                        var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType,
+                                ConsumableHelper.GetHolePosStr(row.dstPos - 1, dstConsumableType.RowCount, dstConsumableType.ColCount, a1Pos, true));
+
+                        seqList.Add(new Seq
+                        {
+                            // 枪头（每条记录取新枪头）
+                            TipTemplateIndex = tipTemplateIndex,
+                            TipTemplateAssign = false,
+                            TipTemplateConsumableType = tipTemplateConsumableType,
+                            TipChannel = new int[ParamsHelper.HeadList[headUsedIndex].ChannelRow,
+                                                                ParamsHelper.HeadList[headUsedIndex].ChannelCol],
+                            IsTakeTip = true,
+
+                            // 源盘
+                            SourceTemplateName = row.srcLabel,
+                            SourceTemplateIndex = sourceTemplateIndex,
+                            SourceTemplateConsumableType = srcConsumableType,
+                            SourceHoleIndexList = new List<HoleIndex> { sourceHoleIndex },
+
+                            // 靶盘（一吸一喷）
+                            TargetTemplateName = row.dstLabel,
+                            TargetTemplateIndexList = new List<int> { targetTemplateIndex },
+                            TargetTemplateConsumableType = dstConsumableType,
+                            TargetHoleIndexList = new List<HoleIndex> { targetHoleIndex },
+
+                            // 体积
+                            VolumeEachList = new List<Volume> { new Volume { Original = row.volume } },
+
+                            // 轮次
+                            Round = round,
+
+                            HeadUsedIndex = headUsedIndex,
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show((string)this.FindResource("Prompt_Excel_Error_1") + row.row
+                                        + (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
+                        LogHelper.Error(ex.StackTrace);
+                        return false;
+                    }
+                }
+
+                try
+                {
+                    Dispatcher.Invoke(() => InitTemplates(1));   // 只渲染第1轮
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show((string)this.FindResource("Prompt_Pls_Check_Excel_And_Consumable_Info"));
+                    LogHelper.Error(ex.StackTrace);
+                    return false;
+                }
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// 计算多点校准
+        /// </summary>
+        private void CalcCalibration()
+        {
+            foreach (var seq in seqList)
+            {
+                var headIndex = seq.HeadUsedIndex;
+                foreach (var volume in seq.VolumeEachList)
+                {
+                    volume.Calibration = Utils.DataHelper.CalibrateVol(headIndex, volume.Original);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 初始化盘位信息
+        /// </summary>
+        private void InitTemplates(int round = 1)
+        {
+            // 先清空原盘位数据
+            foreach (var t in templateCanUse)
+            {
+                t.Children.Clear();
+            }
+
+            tipTemplateDict.Clear();
+            sourceTemplateDict.Clear();
+            targetTemplateDict.Clear();
+
+            // 由于可能存在ep管架之类的占据多个盘面的耗材，所以先复位每个盘位占据盘面个数为1
+            for (var i = 0; i < this.GridTemplateContainer.Children.Count; i++)
+            {
+                var controlTemplate = this.GridTemplateContainer.Children[i] as UserControls.ControlTemplate;
+                Grid.SetRow(controlTemplate, 0);
+                Grid.SetRowSpan(controlTemplate, ConstantsUtils.TemplateOccupyGridSpan);
+                Grid.SetColumn(controlTemplate, 0);
+                Grid.SetColumnSpan(controlTemplate, ConstantsUtils.TemplateOccupyGridSpan);
+            }
+
+            // 枪头盒、源盘、靶盘盘位标题计数器
+            var tipTemplateTitleTick = 0;
+            var sourceTemplateTitleTick = 0;
+            var targetTemplateTitleTick = 0;
+            // 只渲染当前轮次的 seq
+            foreach (var seq in seqList.Where(s => s.Round == round))
+            {
+                // 只含有特殊指令
+                if (seq.IsCmdOnly)
+                    continue;
+
+                var tipTemplateConsumableType = seq.TipTemplateConsumableType;
+                var tipTemplateIndex = seq.TipTemplateIndex;
+                var tipChannel = seq.TipChannel;
+                var sourceTemplateConsumableType = seq.SourceTemplateConsumableType;
+                var sourceTemplateIndex = seq.SourceTemplateIndex;
+                // var sourceHoleIndex = seq.SourceHoleIndex;
+                var sourceHoleIndexList = seq.SourceHoleIndexList; // 20250625 SourceHoleIndex改成SourceHoleIndexList
+                var volumeEachList = seq.VolumeEachList;
+                var targetTemplateConsumableType = seq.TargetTemplateConsumableType;
+                var targetTemplateIndexList = seq.TargetTemplateIndexList;
+                var targetHoleIndexList = seq.TargetHoleIndexList;
+                var serialDilute = seq.SerialDilute;
+                var headUsedIndex = seq.HeadUsedIndex;
+                var isPumpLiquid = seq.IsPumpLiquid;
+
+
+                // 枪头盘位
+                if (!isPumpLiquid)
+                {
+                    if (!tipTemplateDict.ContainsKey(tipTemplateIndex))
+                    {
+                        // 设置占用盘位
+                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, tipTemplateIndex, tipTemplateConsumableType.TemplateOccupySpan);
+
+                        tipTemplateTitleTick++;
+                        var template = new Template
+                        {
+                            Title = (string)this.FindResource("TemplateTips") + tipTemplateTitleTick,
+                            RowCount = tipTemplateConsumableType.RowCount,
+                            ColCount = tipTemplateConsumableType.ColCount,
+                            Step = tipTemplateConsumableType.HoleStep,
+                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
+                            Type = ETemplateType.Tip
+                        };
+                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
+                        for (var i = 0; i < holeTotalCount; i++)
+                        {
+                            template.Holes.Add(new Hole { Index = i });
+                        }
+                        // 枪头盒是否灵活取枪头（判断所有seq是否含有自定义取枪头数目，如果是，则认为是灵活取枪头）
+                        var tipBoxFlexible = TipHelper.IsTipBoxFlexible(headUsedIndex, seqList, tipTemplateConsumableType);
+                        var controlTemplateTip = new ControlTemplateTip(template, tipTemplateConsumableType) { TipBoxTemplateIndex = tipTemplateIndex, TipBoxFlexible = tipBoxFlexible, HeadUsedIndex = headUsedIndex };
+                        tipTemplateDict.Add(tipTemplateIndex, controlTemplateTip);
+                        templateCanUse[tipTemplateIndex].Children.Add(controlTemplateTip);
+                    }
+                }
+
+                // 源盘盘位
+                if (!isPumpLiquid)
+                {
+                    var sourceTotalVolume = 0m; // 源孔所需液体量
+                    for (var i = 0; i < targetHoleIndexList.Count; i++)
+                    {
+                        if (serialDilute)
+                            sourceTotalVolume = volumeEachList[0].Original;
+                        // 如果一吸多喷投入体积只有一个，就默认为相同体积，否则体积数必须等于靶孔数
+                        else if (volumeEachList.Count > 1)
+                            sourceTotalVolume += volumeEachList[i].Original;
+                        else
+                            sourceTotalVolume += volumeEachList[0].Original;
+                    }
+                    if (!sourceTemplateDict.ContainsKey(sourceTemplateIndex))
+                    {
+                        // 设置占用盘位
+                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, sourceTemplateIndex, sourceTemplateConsumableType.TemplateOccupySpan);
+
+                        sourceTemplateTitleTick++;
+                        var template = new Template
+                        {
+                            Title = (string)this.FindResource("TemplateSource") + sourceTemplateTitleTick,
+                            SubTitle = sourceTemplateConsumableType.GroupName + ": " + seq.SourceTemplateName,
+                            RowCount = sourceTemplateConsumableType.RowCount,
+                            ColCount = sourceTemplateConsumableType.ColCount,
+                            Step = sourceTemplateConsumableType.HoleStep,
+                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
+                            Type = ETemplateType.Source
+                        };
+                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
+                        for (var i = 0; i < holeTotalCount; i++)
+                        {
+                            template.Holes.Add(new Hole { Index = i, Capacity = 0 });
+                        }
+
+                        var controlTemplate = new ControlTemplateCommon(template, sourceTemplateConsumableType);
+                        // controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
+                        // 20250625 SourceHoleIndex改成SourceHoleIndexList
+                        foreach (var sourceHoleIndex in sourceHoleIndexList)
+                        {
+                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
+                        }
+                        sourceTemplateDict.Add(sourceTemplateIndex, controlTemplate);
+                        templateCanUse[sourceTemplateIndex].Children.Add(controlTemplate);
+                    }
+                    else
+                    {
+                        if (!sourceTemplateDict.TryGetValue(sourceTemplateIndex, out var controlTemplate))
+                            return; // 该源盘位Index不存在
+                        // controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
+                        // 20250625 SourceHoleIndex改成SourceHoleIndexList
+                        foreach (var sourceHoleIndex in sourceHoleIndexList)
+                        {
+                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, sourceHoleIndex, tipChannel, sourceTotalVolume);
+                        }
+                    }
+                }
+
+                // 靶盘盘位
+                var targetTemplateIndexCount = targetTemplateIndexList.Count;
+                for (var i = 0; i < targetTemplateIndexCount; i++)
+                {
+                    var targetTemplateIndex = targetTemplateIndexList[i];
+
+                    if (!targetTemplateDict.ContainsKey(targetTemplateIndex))
+                    {
+                        // 设置占用盘位
+                        ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, targetTemplateIndex, targetTemplateConsumableType.TemplateOccupySpan);
+
+                        targetTemplateTitleTick++;
+                        var template = new Template
+                        {
+                            Title = (string)this.FindResource("TemplateTarget") + targetTemplateTitleTick,
+                            SubTitle = targetTemplateConsumableType.GroupName + ": " + seq.TargetTemplateName,
+                            RowCount = targetTemplateConsumableType.RowCount,
+                            ColCount = targetTemplateConsumableType.ColCount,
+                            Step = targetTemplateConsumableType.HoleStep,
+                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
+                            Type = ETemplateType.Target
+                        };
+                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
+                        for (var j = 0; j < holeTotalCount; j++)
+                        {
+                            template.Holes.Add(new Hole { Index = j, Capacity = 0 });
+                        }
+
+                        var controlTemplate = new ControlTemplateCommon(template, targetTemplateConsumableType);
+
+                        // 多靶多孔
+                        if (targetTemplateIndexCount > 1)
+                        {
+                            var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[i] : volumeEachList[0];
+                            var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
+                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndexList[i], tipChannel, targetVolumeTotal);
+                        }
+                        // 1靶多孔
+                        else
+                        {
+                            for (var j = 0; j < targetHoleIndexList.Count; j++)
+                            {
+                                var targetHoleIndex = targetHoleIndexList[j];
+                                var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[j] : volumeEachList[0];
+                                var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
+                                controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndex, tipChannel, targetVolumeTotal);
+                            }
+                        }
+
+                        targetTemplateDict.Add(targetTemplateIndex, controlTemplate);
+                        templateCanUse[targetTemplateIndex].Children.Add(controlTemplate);
+                    }
+                    else
+                    {
+                        if (!targetTemplateDict.TryGetValue(targetTemplateIndex, out var controlTemplate))
+                            return; // 该靶盘位Index不存在
+
+                        // 多靶多孔
+                        if (targetTemplateIndexCount > 1)
+                        {
+                            var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[i] : volumeEachList[0];
+                            var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
+                            controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndexList[i], tipChannel, targetVolumeTotal);
+                        }
+                        // 1靶多孔
+                        else
+                        {
+                            for (var j = 0; j < targetHoleIndexList.Count; j++)
+                            {
+                                var targetHoleIndex = targetHoleIndexList[j];
+                                var targetVolumeEach = volumeEachList.Count > 1 ? volumeEachList[j] : volumeEachList[0];
+                                var targetVolumeTotal = targetVolumeEach.Original * sourceHoleIndexList.Count;
+                                controlTemplate.RefreshTemplateHolesStatus(headUsedIndex, targetHoleIndex, tipChannel, targetVolumeTotal);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// 取枪头 
         /// </summary>
         /// <param name="headUsedIndex">使用的移液头Index</param>
@@ -3404,7 +2278,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                     else
                     {
                         // 把nextTipIndex转为孔名称（如A1、B2等），避免枪头盒下拉列表总数和nextTipIndex不是对应关系造成的取枪头定位问题
-                        var posStr = ConsumableHelper.GetHolePosStr(nextTipIndex, consumableType.RowCount, consumableType.ColCount, ParamsHelper.CommonSettingList[headUsedIndex].A1Pos);
+                        var posStr = ConsumableHelper.GetHolePosStr(nextTipIndex, consumableType.RowCount, consumableType.ColCount, ParamsHelper.CommonSettingList[headUsedIndex].A1Pos, true);
                         tipTemplateUsed.SplitButtonTipsBoxPos.SelectedItem = posStr;
                         // tipTemplateUsed.SplitButtonTipsBoxPos.SelectedIndex = nextTipIndex;
                     }
