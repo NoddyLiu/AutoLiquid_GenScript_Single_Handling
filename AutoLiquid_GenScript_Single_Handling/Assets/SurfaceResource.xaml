@@ -1,0 +1,70 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:s="clr-namespace:System;assembly=mscorlib"
+                    xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro">
+
+    <Style TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="微软雅黑"/>
+    </Style>
+    <Style TargetType="{x:Type Label}">
+        <Setter Property="FontFamily" Value="微软雅黑"/>
+    </Style>
+
+    <!--移液头2不可用Tag-->
+    <s:Boolean x:Key="Head2DisableTag">True</s:Boolean>
+
+    <!--主窗体大小-->
+    <s:Double x:Key="MainWinWidth">1440</s:Double>
+    <s:Double x:Key="MainWinHeight">900</s:Double>
+
+        <!--默认字体大小-->
+    <s:Double x:Key="DefaultFontSize">30</s:Double>
+
+    <!--颜色-->
+    <SolidColorBrush x:Key="TemplateBorderColor"  Color="Gray"/>
+    <SolidColorBrush x:Key="TemplateTipBackground"  Color="LightSkyBlue"/>
+    <SolidColorBrush x:Key="TemplateSourceBackground"  Color="LightSkyBlue"/>
+    <SolidColorBrush x:Key="TemplateTargetBackground"  Color="ForestGreen"/>
+
+    <!--表格字体居中-->
+    <Style x:Key="CenterCellStyle" TargetType="{x:Type DataGridCell}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type DataGridCell}">
+                    <Grid Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--设置界面-->
+    <s:Double x:Key="SettingTitleFontSize">18</s:Double>
+    <s:Double x:Key="SettingTitleWidth">123</s:Double>
+    <s:Double x:Key="SettingColonWidth">15</s:Double>
+    <s:Double x:Key="SettingValueWidth">65</s:Double>
+    <s:Double x:Key="SettingHoleValueWidth">60</s:Double>
+    <s:Double x:Key="SettingBtnFontSize">15</s:Double>
+    <s:Double x:Key="SettingNormalFontSize">15</s:Double>
+    <s:Double x:Key="SettingUnitWidth">50</s:Double>
+    <s:Double x:Key="SettingGroupBoxTitleFontSize">15</s:Double>
+    <s:Double x:Key="SettingSpeedWidth">195</s:Double>
+    <s:Double x:Key="BtnTrimmingWidth">23</s:Double>
+    <Thickness x:Key="TemplateBorderThickness">3</Thickness>
+
+    <!--GroupBox外边框-->
+    <Thickness x:Key="GroupBoxBorderThickness">3</Thickness>
+
+    <!--Tab样式-->
+    <Style x:Key="MetroTabStyle" TargetType="{x:Type controls:MetroTabItem}">
+        <Setter Property="controls:HeaderedControlHelper.HeaderFontSize" Value="20"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="MetroTabStyleWithClose" TargetType="{x:Type controls:MetroTabItem}">
+        <Setter Property="controls:HeaderedControlHelper.HeaderFontSize" Value="20"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="CloseButtonEnabled" Value="True"/>
+    </Style>
+
+</ResourceDictionary>

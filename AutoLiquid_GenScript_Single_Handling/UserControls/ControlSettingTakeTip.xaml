@@ -1,0 +1,27 @@
+﻿<UserControl x:Class="AutoLiquid_GenScript_Single_Handling.UserControls.ControlSettingTakeTip"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AutoLiquid_GenScript_Single_Handling.UserControls"
+             xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+             mc:Ignorable="d" 
+             Background="White">
+    <Grid>
+        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+            <StackPanel Orientation="Horizontal">
+                <Label HorizontalContentAlignment="Center" Content="{StaticResource TakeTipMethod}" Width="{StaticResource SettingTitleWidth}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                <RadioButton x:Name="RBtnTakeTipMethodCol" GroupName="TakeTipMethod" Content="{StaticResource EachCol}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" IsChecked="True"/>
+                <RadioButton x:Name="RBtnTakeTipMethodRow" GroupName="TakeTipMethod" Content="{StaticResource EachRow}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" ToolTip="{StaticResource Prompt_Take_Tip_Direction}" Margin="10,0,0,0">
+                <Label HorizontalContentAlignment="Center" Content="{StaticResource TakeTipDirection}" Width="{StaticResource SettingTitleWidth}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                <RadioButton x:Name="RBtnTakeTipLeft2Right" GroupName="TakeTipDirection" Content="{StaticResource Left2Right}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" IsChecked="True"/>
+                <RadioButton x:Name="RBtnTakeTipRight2Left" GroupName="TakeTipDirection" Content="{StaticResource Right2Left}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

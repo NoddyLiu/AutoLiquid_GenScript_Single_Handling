@@ -1,0 +1,168 @@
+﻿<UserControl x:Class="AutoLiquid_GenScript_Single_Handling.UserControls.ControlSettingVolume"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AutoLiquid_GenScript_Single_Handling.UserControls"
+             xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+             xmlns:system="clr-namespace:System;assembly=mscorlib"
+             mc:Ignorable="d" 
+             Background="White">
+    <UserControl.Resources>
+        <system:Double x:Key="TitleWidth">178</system:Double>
+    </UserControl.Resources>
+
+    <Grid>
+        <StackPanel Orientation="Vertical" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,5,0,0">
+                <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}">
+                    <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource AbsorbAirBefore}" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <TextBox x:Name="TextBoxAbsorbAirBeforePercent" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}">
+                    <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource AbsorbAirAfter}" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <TextBox x:Name="TextBoxAbsorbAirAfterPercent" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"  ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}">
+                    <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource AirDelayAfterJet}" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <TextBox x:Name="TextBoxAirDelayAfterJet" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingUnitWidth}" Content="s" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,5,0,0">
+                <!-- <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}"> -->
+                <!--     <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource AbsorbLiquidMore}" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/> -->
+                <!--     <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/> -->
+                <!--     <TextBox x:Name="TextBoxAbsorbLiquidMorePercent" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"  ToolTip="{StaticResource LiquidRangePercent}"/> -->
+                <!--     <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/> -->
+                <!-- </StackPanel> -->
+                <!-- <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfFormerVolume}"> -->
+                <!--     <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource JetLiquidMore}" FontSize="{StaticResource MahApps.Font.Size.Default}"/> -->
+                <!--     <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/> -->
+                <!--     <TextBox x:Name="TextBoxJetLiquidMoreScale" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}" /> -->
+                <!--     <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/> -->
+                <!-- </StackPanel> -->
+
+                <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}">
+                    <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource AbsorbLiquidMore}" FontSize="{StaticResource MahApps.Font.Size.Default}" ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <TextBox x:Name="TextBoxAbsorbLiquidMorePercent" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"  ToolTip="{StaticResource LiquidRangePercent}"/>
+                    <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" ToolTip="{StaticResource PercentOfRange}">
+                    <Label Width="{StaticResource TitleWidth}" HorizontalContentAlignment="Center" Content="{StaticResource ReverseJetAfterAbsorb}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <TextBox x:Name="TextBoxReverseJetAfterAbsorbPercent" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}" />
+                    <Label Width="{StaticResource SettingUnitWidth}" Content="%" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                <CheckBox x:Name="CheckBoxMultiCalibration" VerticalAlignment="Center" Content="{StaticResource MultiCalibration}" FontSize="{StaticResource MahApps.Font.Size.Default}" Margin="40,0,0,0"/>
+                <StackPanel x:Name="StackPanelMultiCalibration" Orientation="Vertical" Margin="35,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Label Content="1." FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource Volume}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPVol1" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label HorizontalContentAlignment="Center" Content="{StaticResource Compensation}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPCompensation1" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label Content="2." FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource Volume}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPVol2" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label HorizontalContentAlignment="Center" Content="{StaticResource Compensation}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPCompensation2" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label Content="3." FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource Volume}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPVol3" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label HorizontalContentAlignment="Center" Content="{StaticResource Compensation}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPCompensation3" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label Content="4." FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource Volume}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPVol4" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label HorizontalContentAlignment="Center" Content="{StaticResource Compensation}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPCompensation4" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label Content="5." FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource Volume}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPVol5" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label HorizontalContentAlignment="Center" Content="{StaticResource Compensation}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxPCompensation5" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel x:Name="StackPanelMultiCalibrationTest" Orientation="Vertical" VerticalAlignment="Center">
+                    <Label Content="{StaticResource Test}" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="RBtnJetOne2One" GroupName="Variable" Content="{StaticResource JetOne2One}"  FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" IsChecked="True"/>
+                        <RadioButton x:Name="RBtnJetOne2More" GroupName="Variable" Content="{StaticResource JetOne2More}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource HeadAirSeal}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxHeadAirSeal" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Button x:Name="BtnHeadAirSeal" Content="{StaticResource Execute}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Width="60" Height="30" FontSize="{StaticResource SettingBtnFontSize}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource AspVolume}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxAspVol" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Button x:Name="BtnAspVol" Content="{StaticResource Execute}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Width="60" Height="30" FontSize="{StaticResource SettingBtnFontSize}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Label  HorizontalContentAlignment="Center" Content="{StaticResource DisVolume1}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center"/>
+                        <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <TextBox x:Name="TextBoxDisVol1" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                        <Button x:Name="BtnDisVol1"  Width="60"  Content="{StaticResource Execute}"  FontSize="{StaticResource SettingBtnFontSize}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" />
+
+                        <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                            <Label  HorizontalContentAlignment="Center" Content="{StaticResource DisVolume2}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center"/>
+                            <Label Width="{StaticResource SettingColonWidth}" Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                            <TextBox x:Name="TextBoxDisVol2" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                            <Label Width="{StaticResource SettingUnitWidth}" Content="μl" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                            <Button x:Name="BtnDisVol2"  Width="60"  Content="{StaticResource Execute}"  FontSize="{StaticResource SettingBtnFontSize}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <Button x:Name="BtnDisAll" Content="{StaticResource DisAll}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Width="80" Height="30" FontSize="{StaticResource SettingBtnFontSize}" Margin="0,5,0,0"/>
+
+</StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

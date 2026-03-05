@@ -1,0 +1,106 @@
+﻿<metro:MetroWindow x:Class="AutoLiquid_GenScript_Single_Handling.Window.WindowCommonSettingHead"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:metro="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        xmlns:system="clr-namespace:System;assembly=mscorlib"
+        xmlns:userControls="clr-namespace:AutoLiquid_GenScript_Single_Handling.UserControls"
+        mc:Ignorable="d"
+        d:DesignWidth="1750"
+        d:DesignHeight="1500"
+       Title="{StaticResource Head1Setting}" WindowStartupLocation="CenterScreen" WindowState="Maximized" GlowBrush="{DynamicResource 	MahApps.Brushes.Accent}">
+
+    <Grid Margin="5">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <StackPanel Orientation="Vertical">
+                <!--耗材类型-->
+                <GroupBox x:Name="GroupBoxConsumable" BorderThickness="{StaticResource GroupBoxBorderThickness}">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource ConsumableType}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+
+                </GroupBox>
+
+                <!--移液头属性-->
+                <GroupBox x:Name="GroupBoxHeadAttribute"  BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0" Visibility="Collapsed">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource HeadAttribute}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--取枪头-->
+                <GroupBox x:Name="GroupBoxTakeTip" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0" Visibility="Collapsed">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource TakeTip}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--退枪头-->
+                <GroupBox x:Name="GroupBoxReleaseTip" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource ReleaseTip}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--体积设置-->
+                <GroupBox x:Name="GroupBoxVolume" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource VolumeSetting}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--速度设置-->
+                <GroupBox x:Name="GroupBoxSpeed" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource SettingSpeed}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--推出盘位-->
+                <GroupBox x:Name="GroupBoxLaunchPlate" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource LaunchPlate}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--盘位摆放-->
+                <GroupBox x:Name="GroupBoxPlatePutting" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0" Visibility="Collapsed">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource PlatePutting}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <!--位置微调-->
+                <GroupBox x:Name="GroupBoxDebugPos" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0" Visibility="Collapsed">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource DebugPos}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
+                <Rectangle Fill="LightGray" VerticalAlignment="Top" Height="2" Margin="0,10,0,0"/>
+
+                <!--指令和复位-->
+                <StackPanel Orientation="Vertical" Margin="0,10,0,0">
+                    <StackPanel Orientation="Horizontal" >
+                        <Label Content="{StaticResource Command}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalContentAlignment="Center"/>
+                        <Label Content=":" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalContentAlignment="Center"/>
+                        <TextBox x:Name="TextBoxCommand" Width="700" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalContentAlignment="Center"/>
+                        <Button x:Name="BtnCommand" Content="{StaticResource Execute}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Width="60" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnResetX" Content="{StaticResource ResetX}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetY" Content="{StaticResource ResetY}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetZ" Content="{StaticResource ResetZ}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetW" Content="{StaticResource ResetW}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetP" Content="{StaticResource ResetP}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetQ" Content="{StaticResource ResetQ}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                        <Button x:Name="BtnResetAll" Content="{StaticResource ResetAll}" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Height="30" Margin="10,0,0,0" FontSize="{StaticResource SettingBtnFontSize}" metro:ControlsHelper.ContentCharacterCasing="Normal"/>
+                    </StackPanel>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</metro:MetroWindow>
