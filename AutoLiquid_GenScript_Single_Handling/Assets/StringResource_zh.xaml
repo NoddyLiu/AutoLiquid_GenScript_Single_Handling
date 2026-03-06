@@ -315,6 +315,7 @@
     <s:String x:Key="Prompt_Check_Code_Error">校验码错误</s:String>
     <s:String x:Key="Prompt_Params_Parse_Error_Check_Log_For_Help">参数解析失败，请查看错误日志获取更多信息！</s:String>
     <s:String x:Key="Prompt_Need_Replace_Tipbox_Midway">程序中途需要更换枪头盒，点击"确认"开始运行程序！</s:String>
+    <s:String x:Key="Prompt_Tip_Not_Enough_Pls_Fill_And_Start">运行本轮程序枪头数量不足，请置满枪头盘位后，再次点击"运行"程序！</s:String>
     <s:String x:Key="Prompt_Tip_Not_Enough_Pls_Fill_And_Continue">枪头数量不足，请置满枪头盘位后，点击"确认"继续程序！</s:String>
     <s:String x:Key="Prompt_Template_Occupy">即一个该耗材占用多少个盘位</s:String>
     <s:String x:Key="Prompt_Template_Occupy_Span1">1个标准盘位</s:String>

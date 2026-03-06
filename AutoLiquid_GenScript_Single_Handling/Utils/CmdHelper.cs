@@ -2327,7 +2327,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
 
             if (!CmdHelper.frmDAE.isCanNetSuccess || frmDAE.socketSend == null || (ParamsHelper.IO.Tcp && !frmDAE.socketSend.Connected))
             {
-                Thread.Sleep(10);
+                Thread.Sleep(1);
                 if (isNeedManualStop)
                     ManualStop(intercept);
                 return true;

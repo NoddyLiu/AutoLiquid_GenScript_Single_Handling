@@ -6,8 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/AutoLiquid_SuperH2;component/Assets/StringResource_zh.xaml"/>
-                <ResourceDictionary Source="pack://application:,,,/AutoLiquid_SuperH2;component/Assets/SurfaceResource.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/AutoLiquid_GenScript_Single_Handling;component/Assets/StringResource_zh.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/AutoLiquid_GenScript_Single_Handling;component/Assets/SurfaceResource.xaml"/>
 
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />

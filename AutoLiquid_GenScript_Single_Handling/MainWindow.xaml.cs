@@ -1,4 +1,9 @@
-﻿using AutoLiquid_Library.Comm;
+﻿using AutoLiquid_GenScript_Single_Handling.EntityCommon;
+using AutoLiquid_GenScript_Single_Handling.EntityJson;
+using AutoLiquid_GenScript_Single_Handling.UserControls;
+using AutoLiquid_GenScript_Single_Handling.Utils;
+using AutoLiquid_GenScript_Single_Handling.Window;
+using AutoLiquid_Library.Comm;
 using AutoLiquid_Library.Enum;
 using AutoLiquid_Library.Exceptions;
 using AutoLiquid_Library.Utils;
@@ -17,6 +22,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,11 +39,6 @@ using System.Windows.Media.Media3D;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Xml.Serialization;
-using AutoLiquid_GenScript_Single_Handling.EntityCommon;
-using AutoLiquid_GenScript_Single_Handling.EntityJson;
-using AutoLiquid_GenScript_Single_Handling.UserControls;
-using AutoLiquid_GenScript_Single_Handling.Utils;
-using AutoLiquid_GenScript_Single_Handling.Window;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using ConstantsUtils = AutoLiquid_GenScript_Single_Handling.Utils.ConstantsUtils;
 using ControlTemplate = AutoLiquid_GenScript_Single_Handling.UserControls.ControlTemplate;
@@ -75,6 +76,9 @@ namespace AutoLiquid_GenScript_Single_Handling
 
         // 枪头盘位（key：所在盘位index）
         public static Dictionary<int, ControlTemplateTip> tipTemplateDict = new Dictionary<int, ControlTemplateTip>();
+        // 跨轮次保留的枪头盒状态（key：盘位index）
+        // 用于第2轮及以后复用上一轮剩余枪头，避免重新渲染时状态丢失
+        private Dictionary<int, ControlTemplateTip> tipTemplatePersistDict = new Dictionary<int, ControlTemplateTip>();
 
         // 源盘盘位（key：所在盘位index）
         public static Dictionary<int, ControlTemplateCommon> sourceTemplateDict =
@@ -763,9 +767,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                     {
                         if (ParamsHelper.HeadList[headIndex].Available)
                         {
-                            // var absorbAllPercent = ParamsHelper.CommonSettingList[headIndex].AbsorbAirBeforePercent +
-                            //                        ParamsHelper.CommonSettingList[headIndex].AbsorbAirAfterPercent +
-                            //                        ParamsHelper.CommonSettingList[headIndex].AbsorbLiquidMoreOne2MorePercent;
                             var absorbAllPercent = ParamsHelper.CommonSettingList[headIndex].AbsorbAirBeforePercent +
                                                    ParamsHelper.CommonSettingList[headIndex].AbsorbAirAfterPercent +
                                                    ParamsHelper.CommonSettingList[headIndex].AbsorbLiquidMorePercent;
@@ -794,12 +795,8 @@ namespace AutoLiquid_GenScript_Single_Handling
                     var replaceTipOverRange = (bool)this.CheckBoxReplaceTipOverRange.IsChecked;
 
                     /**
-                     * 是否有足够枪头逻辑：
-                     * ①不指定枪头盒盘位：需要累积剩余枪头数目
-                     * ②指定枪头盒盘位：只需计算指定盘位剩余枪头数目
-                     */
-                    // 运行中途是否需要置满枪头盒
-                    var replaceTipboxMidway = false;
+                     * 是否有足够枪头执行本轮
+                    */
                     for (var headIndex = 0; headIndex < ParamsHelper.HeadList.Count; headIndex++)
                     {
                         if (!ParamsHelper.HeadList[headIndex].Available)
@@ -809,57 +806,24 @@ namespace AutoLiquid_GenScript_Single_Handling
                         var tipTotalCountRemain = 0;
                         // 枪头盘位
                         var tipTemplates = tipTemplateDict.Values.Where(p => p.HeadUsedIndex == headIndex);
-                        // 是否指定枪头盘位
-                        var isTipTemplateAssign = seqList.Exists(p => p.TipTemplateAssign);
-
-                        // 指定枪头盒盘位
-                        if (isTipTemplateAssign)
+                        foreach (var template in tipTemplates)
                         {
-                            foreach (var template in tipTemplates)
-                            {
-                                tipTotalCountRemain = TipHelper.CalculateTipRemainCountByHead(template);
-                                var tipTotalCountNeed = 0;
-                                TipHelper.CalculateTipNeedCountByHead(seqList, headIndex, template.TipBoxTemplateIndex, ref tipTotalCountNeed, replaceTipOverRange);
-                                // 是否中途需要置满枪头盒
-                                if (tipTotalCountNeed > tipTotalCountRemain)
-                                {
-                                    replaceTipboxMidway = true;
-                                    break;
-                                }
-                            }
+                            tipTotalCountRemain += TipHelper.CalculateTipRemainCountByHead(template);
                         }
-                        // 不指定枪头盒盘位
-                        else
+                        // 所需枪头数目 = 每条移液信息是否取枪头 + 单条移液信息中超过量程分液是否换枪头
+                        var tipTotalCountNeed = 0;
+                        var thisRoundSeqList = seqList.Where(s => s.Round == 1).ToList();
+                        TipHelper.CalculateTipNeedCountByHead(thisRoundSeqList, headIndex, null, ref tipTotalCountNeed, replaceTipOverRange);
+                        // 是否中途需要置满枪头盒
+                        if (tipTotalCountNeed > tipTotalCountRemain)
                         {
-                            foreach (var template in tipTemplates)
-                            {
-                                tipTotalCountRemain += TipHelper.CalculateTipRemainCountByHead(template);
-                            }
-                            // 所需枪头数目 = 每条移液信息是否取枪头 + 单条移液信息中超过量程分液是否换枪头
-                            var tipTotalCountNeed = 0;
-                            TipHelper.CalculateTipNeedCountByHead(seqList, headIndex, null, ref tipTotalCountNeed, replaceTipOverRange);
-                            // 是否中途需要置满枪头盒
-                            if (tipTotalCountNeed > tipTotalCountRemain)
-                            {
-                                replaceTipboxMidway = true;
-                                break;
-                            }
+                            MessageBox.Show((string)this.FindResource("Prompt_Tip_Not_Enough_Pls_Fill_And_Start"));
+                            return;
                         }
                     }
 
-                    // 运行中途需要置满枪头盒
-                    if (replaceTipboxMidway)
-                    {
-                        if (MessageBox.Show((string)this.FindResource("Prompt_Need_Replace_Tipbox_Midway"),
-                                (string)this.FindResource("Prompt"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK)
-                        {
-                            // 运行
-                            RunProcedure(replaceTipOverRange);
-                        }
-                    }
-                    else
-                        // 运行
-                        RunProcedure(replaceTipOverRange);
+                    // 运行
+                    RunProcedure(replaceTipOverRange);
                 }
             }
             // 复位
@@ -991,117 +955,109 @@ namespace AutoLiquid_GenScript_Single_Handling
         }
 
         /// <summary>
-        /// 执行程序（带轮次提示）
-        /// Round=1 的 seq 先执行，执行完后提示用户摆放后续轮次耗材，再继续
-        /// </summary>
-        private void RunProcedure(bool replaceTipOverRange)
-        {
-            int maxRound = seqList.Count == 0 ? 1 : seqList.Max(s => s.Round);
-
-            // 第1轮：提示摆放第1轮耗材
-            if (MessageBox.Show(
-                    BuildRoundPrompt(1, maxRound),
-                    (string)this.FindResource("Prompt"),
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Warning) != MessageBoxResult.OK)
-                return;
-
-            RunRound(replaceTipOverRange, 1, maxRound);
-        }
-
-        /// <summary>
         /// 构建轮次提示文本
         /// </summary>
         private string BuildRoundPrompt(int round, int maxRound)
         {
-            if (maxRound <= 1)
-                return (string)this.FindResource("Prompt_Need_To_Put_Template_OK");
-
-            // 收集本轮用到的盘名
             var roundSeqs = seqList.Where(s => s.Round == round).ToList();
-            var srcNames = roundSeqs.Select(s => s.SourceTemplateName).Distinct();
-            var dstNames = roundSeqs.Select(s => s.TargetTemplateName).Distinct();
-            var allNames = srcNames.Union(dstNames).Distinct();
-            return $"第 {round} / {maxRound} 轮，请摆放以下耗材后点击确认：\n" +
+
+            // 收集本轮所有（盘位index, 盘名）对，按盘位index升序（从左往右、从上到下）去重排列
+            var indexNamePairs = new List<(int index, string name)>();
+            foreach (var seq in roundSeqs)
+            {
+                indexNamePairs.Add((seq.SourceTemplateIndex, seq.SourceTemplateName));
+                for (var i = 0; i < seq.TargetTemplateIndexList.Count; i++)
+                    indexNamePairs.Add((seq.TargetTemplateIndexList[i], seq.TargetTemplateName));
+            }
+
+            var allNames = indexNamePairs
+                .GroupBy(p => p.index)
+                .OrderBy(g => g.Key)
+                .Select(g => g.First().name)
+                .Distinct()
+                .ToList();
+
+            return $"第 {round} / {maxRound} 轮，请摆放以下耗材后点击“确认”继续：\n" +
                    string.Join("\n", allNames.Select(n => "  • " + n));
+        }
+
+        /// <summary>
+        /// 执行程序（带轮次提示）
+        /// </summary>
+        private void RunProcedure(bool replaceTipOverRange)
+        {
+            int maxRound = seqList.Count == 0 ? 1 : seqList.Max(s => s.Round);
+            RunRound(replaceTipOverRange, maxRound);
         }
 
         /// <summary>
         /// 执行程序
         /// </summary>
         /// <param name="replaceTipOverRange">超过量程分液是否更换枪头</param>
-        /// <param name="currentRound">当前轮次</param>
         /// <param name="maxRound">最大轮次</param>
         /// <summary>
         /// 执行指定轮次（在后台线程中按轮次顺序运行，每轮结束后弹框提示）
         /// </summary>
-        private void RunRound(bool replaceTipOverRange, int currentRound, int maxRound)
+        private void RunRound(bool replaceTipOverRange, int maxRound)
         {
-            Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Running));
-
             var thread = new Thread(() =>
             {
                 try
                 {
-                    LogHelper.InfoTitle((string)this.FindResource("ExecFile") + "《" + excelFilesNameImported + "》 第" + currentRound + "轮");
-
-                    CalcCalibration();
-
-                    for (var headIndex = 0; headIndex < ParamsHelper.HeadList.Count; headIndex++)
-                        if (ParamsHelper.HeadList[headIndex].Available)
-                            CmdHelper.SpeedSet(headIndex, EAxis.All, "", 100, true);
-
-                    CmdHelper.InitMachine(true, false);
-
-                    // 只执行本轮的 seq
-                    TakeActionForRound(replaceTipOverRange, currentRound);
-
-                    CmdHelper.InitMachineAndEasy2Put(true, false);
-
-                    LogHelper.InfoTail((string)this.FindResource("ExecCompleted") + " 第" + currentRound + "轮");
-
-                    if (currentRound < maxRound)
+                    for (int currentRound = 1; currentRound <= maxRound; currentRound++)
                     {
-                        // 还有后续轮次：在 UI 线程提示用户摆放下一轮耗材
-                        bool continueNext = false;
+                        // 每轮开始前提示用户摆放耗材，用户取消则终止所有轮次
+                        bool confirmed = false;
                         Dispatcher.Invoke(() =>
                         {
-                            continueNext = MessageBox.Show(
-                                BuildRoundPrompt(currentRound + 1, maxRound),
+                            InitTemplates(currentRound);
+                            confirmed = MessageBox.Show(
+                                BuildRoundPrompt(currentRound, maxRound),
                                 (string)this.FindResource("Prompt"),
                                 MessageBoxButton.OKCancel,
                                 MessageBoxImage.Warning) == MessageBoxResult.OK;
                         });
-
-                        if (continueNext)
+                        if (!confirmed)
                         {
-                            RunRound(replaceTipOverRange, currentRound + 1, maxRound);
-                        }
-                        else
-                        {
-                            // 用户取消后续轮次
                             Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Stop));
+                            return;
                         }
+
+                        Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Running));
+
+                        LogHelper.InfoTitle((string)this.FindResource("ExecFile") + "《" + excelFilesNameImported + "》 第" + currentRound + "轮");
+
+                        CalcCalibration();
+
+                        for (var headIndex = 0; headIndex < ParamsHelper.HeadList.Count; headIndex++)
+                            if (ParamsHelper.HeadList[headIndex].Available)
+                                CmdHelper.SpeedSet(headIndex, EAxis.All, "", 100, true);
+
+                        CmdHelper.InitMachine(true, false);
+
+                        TakeActionForRound(replaceTipOverRange, currentRound);
+
+                        CmdHelper.InitMachineAndEasy2Put(true, false);
+
+                        LogHelper.InfoTail((string)this.FindResource("ExecCompleted") + " 第" + currentRound + "轮");
                     }
-                    else
+
+                    // 全部轮次完成
+                    Dispatcher.Invoke(() =>
                     {
-                        // 全部轮次完成
-                        Dispatcher.Invoke(() =>
+                        SetLoadingStatus(ERunStatus.Stop);
+                        // 退枪头位置置满
+                        for (var headIndex = 0; headIndex < ParamsHelper.CommonSettingList.Count; headIndex++)
                         {
-                            SetLoadingStatus(ERunStatus.Stop);
-                            // 退枪头位置置满
-                            for (var headIndex = 0; headIndex < ParamsHelper.CommonSettingList.Count; headIndex++)
+                            var commonSetting = ParamsHelper.CommonSettingList[headIndex];
+                            if (commonSetting.ReleaseTipBack2TakePos)
                             {
-                                var commonSetting = ParamsHelper.CommonSettingList[headIndex];
-                                if (commonSetting.ReleaseTipBack2TakePos)
-                                {
-                                    foreach (var tipTemplate in tipTemplateDict.Values.Where(p => p.HeadUsedIndex == headIndex))
-                                        tipTemplate.SplitButtonTipsBoxPos.SelectedIndex = 0;
-                                }
+                                foreach (var tipTemplate in tipTemplateDict.Values.Where(p => p.HeadUsedIndex == headIndex))
+                                    tipTemplate.SplitButtonTipsBoxPos.SelectedIndex = 0;
                             }
-                            MessageBox.Show((string)this.FindResource("Prompt_Liquid_Relief_Success"));
-                        });
-                    }
+                        }
+                        MessageBox.Show((string)this.FindResource("Prompt_Liquid_Relief_Success"));
+                    });
                 }
                 catch (ManualStopException) { }
             });
@@ -1647,6 +1603,10 @@ namespace AutoLiquid_GenScript_Single_Handling
         /// 解析Excel数据（新模板：B~H列，第2行起数据）
         /// B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
         /// </summary>
+        /// <summary>
+        /// 解析Excel数据（新模板：B~H列，第2行起数据）
+        /// B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
+        /// </summary>
         private bool ParseDataFromExcel(string filePath)
         {
             using (Workbook workbook = new Workbook())
@@ -1670,23 +1630,23 @@ namespace AutoLiquid_GenScript_Single_Handling
 
                 seqList.Clear();
 
-                // ── 新Excel列常量（1-based）──
+                // ── Excel列常量（1-based）──
                 const int srcLabelCol = 2;  // B: Source Labware Label（源盘耗材名）
                 const int srcTypeCol = 3;  // C: Source Labware Type（源盘耗材类型）
-                const int srcPosCol = 4;  // D: Source Position（源位置序号，横向1-based）
+                const int srcPosCol = 4;  // D: Source Position（源位置序号，1-based）
                 const int dstLabelCol = 5;  // E: Destination Labware Label（靶盘耗材名）
                 const int dstTypeCol = 6;  // F: Destination Labware Type（靶盘耗材类型）
                 const int dstPosCol = 7;  // G: Destination Position（靶位置序号）
                 const int volumeCol = 8;  // H: Volume（体积）
 
-                // ── 盘面布局（可扩展：仅修改下列两行即可调整枪头盒候选位）──
-                // 最左列盘位index，按需动态分配枪头盒，最多占满
-                var tipTemplateIndexCandidates = new List<int> { 0, 4, 8, 12 }; // 可扩展
-                 int totalTemplateCount = ParamsHelper.Layout.ColCount * ParamsHelper.Layout.RowCount; // 盘面数目
-                 const int headUsedIndex = 0; // 单移液头
+                // ── 盘面布局常量 ──
+                // 枪头盒候选盘位（固定占用最左列，按顺序分配）
+                var tipTemplateIndexCandidates = new List<int> { 0, 4, 8, 12 };
+                int totalTemplateCount = ParamsHelper.Layout.ColCount * ParamsHelper.Layout.RowCount;
+                const int headUsedIndex = 0;
                 var a1Pos = ParamsHelper.CommonSettingList[headUsedIndex].A1Pos;
 
-                // 枪头盒耗材（取第一个 IsTipBox=true）
+                // 枪头盒耗材类型（取第一个 IsTipBox=true）
                 var tipTemplateConsumableType = ParamsHelper.CommonSettingList[headUsedIndex]
                     .Consumables.FirstOrDefault(c => c.IsTipBox);
                 if (tipTemplateConsumableType == null)
@@ -1726,118 +1686,126 @@ namespace AutoLiquid_GenScript_Single_Handling
                     return false;
                 }
 
+                // ══════════════════════════════════════════════════════════════
                 // ── 动态分配轮次与盘位 ──
-                // 每行对应一个round和盘位映射（源盘名/靶盘名 → TipTemplateIndex）
-                // 轮次规则：
-                //   - 当前轮维护：已分配的plate集合（源盘名+靶盘名 union）、已用枪头数、已分配盘位
-                //   - 枪头盒数 = ceil(本轮行数 / tipBoxCapacity)，最多 tipTemplateIndexCandidates.Count 个
-                //   - 当加入本行后，所需枪头盒数+板数 > totalTemplateCount，则开启新轮次
+                //
+                // 核心思路：
+                //   1. 按总行数一次性确定枪头盒数量（所有轮次共用固定候选盘位的前N个）
+                //   2. 未被枪头盒占用的候选盘位，归还给源/靶盘可用盘位池
+                //   3. 剩余盘位不够放所有唯一盘名时，按 maxPlatesPerRound 分轮
+                //   4. 同一行的 srcLabel 和 dstLabel 必须属于同一轮；
+                //      分轮时以"行"为粒度整体分配，避免源盘/靶盘跨轮
+                //   5. 枪头盒游标跨轮连续推进
+                // ══════════════════════════════════════════════════════════════
 
-                // 分轮结果：rowRound[i] = 第i行的轮次(1-based)
-                // 每轮的 plate→盘位index 映射
-                var rowRound = new int[dataRows.Count];
-                // 每轮的 plate→盘位index 映射（盘名→盘位index，不含枪头盒盘位）
-                var roundPlateTemplateIndexMap = new List<Dictionary<string, int>>();
-                // 每轮枪头盒的盘位index列表
-                var roundTipTemplateIndexList = new List<List<int>>();
+                // 步骤1：按总行数一次性确定枪头盒盘位（全程固定，所有轮次共用）
+                int totalTipBoxCount = Math.Min(
+                    tipTemplateIndexCandidates.Count,
+                    (dataRows.Count + tipBoxCapacity - 1) / tipBoxCapacity);
+                var tipIndexSet = new HashSet<int>(tipTemplateIndexCandidates.Take(totalTipBoxCount));
 
-                // 当前轮状态
-                int currentRound = 1;
-                var currentRoundPlates = new List<string>();     // 本轮不重复盘名（有序）
-                var currentRoundRows = new List<int>();        // 本轮dataRows的下标
-                // 枪头盒候选位中已分配的index（跨轮累计，后续轮次优先补充枪头盒）
-                int globalTipCandidateUsed = 0;
+                // 步骤2：剩余可分配给源/靶盘的盘位
+                //   = 全部盘位  −  已用枪头盒盘位
+                //   未用的候选盘位（如候选有4个但只用2个）自动归还给此池
+                var availablePlateSlots = Enumerable.Range(0, totalTemplateCount)
+                    .Where(idx => !tipIndexSet.Contains(idx))
+                    .ToList();
+                int maxPlatesPerRound = availablePlateSlots.Count;
 
-                // 辅助：计算本轮需要的枪头盒数（本轮行数 / tipBoxCapacity 向上取整，且不超过候选数）
-                Func<int, int> calcTipBoxCount = (rowCount) =>
-                    Math.Min(tipTemplateIndexCandidates.Count,
-                             (rowCount + tipBoxCapacity - 1) / tipBoxCapacity);
-
-                // 辅助：提交当前轮（生成映射后压入结果列表）
-                Action commitRound = () =>
+                if (maxPlatesPerRound == 0)
                 {
-                    // 本轮枪头盒数量
-                    int tipCount = calcTipBoxCount(currentRoundRows.Count);
-                    // 枪头盒盘位index列表（从候选位中依次取，全局累积）
-                    var tipIndexList = new List<int>();
-                    for (int k = 0; k < tipCount; k++)
+                    Dispatcher.Invoke(() => MessageBox.Show(
+                        (string)this.FindResource("Prompt_Pls_Check_Excel_And_Consumable_Info")));
+                    return false;
+                }
+
+                // 步骤3：收集全部唯一盘名对（srcLabel, dstLabel），按首次出现顺序，以行为单位
+                //   确保同一行的两个盘名始终在同一轮（作为整体分配）
+                var allUniquePlatePairs = new List<(string src, string dst)>();
+                var seenPlates = new HashSet<string>();
+                foreach (var row in dataRows)
+                {
+                    // 记录首次出现的盘名，以行为粒度确保 src+dst 同轮
+                    if (!seenPlates.Contains(row.srcLabel) || !seenPlates.Contains(row.dstLabel))
                     {
-                        int candidateIdx = globalTipCandidateUsed % tipTemplateIndexCandidates.Count;
-                        tipIndexList.Add(tipTemplateIndexCandidates[candidateIdx]);
-                        globalTipCandidateUsed++;
+                        allUniquePlatePairs.Add((row.srcLabel, row.dstLabel));
+                        seenPlates.Add(row.srcLabel);
+                        seenPlates.Add(row.dstLabel);
+                    }
+                }
+
+                // 步骤4：贪心分组——每组最多占用 maxPlatesPerRound 个盘位槽，生成盘名→盘位映射
+                //   同一行的 src/dst 若已有任意一个被分进某轮，另一个也必须进同一轮
+                var roundPlateTemplateIndexMap = new List<Dictionary<string, int>>();
+                var plateRoundMap = new Dictionary<string, int>();
+
+                {
+                    var currentPlateMap = new Dictionary<string, int>();
+                    var currentSlotIndex = 0;
+                    int currentRound = 1;
+
+                    foreach (var pair in allUniquePlatePairs)
+                    {
+                        // 计算本对需要占用的新盘位数（已在本轮分配过的不重复计）
+                        int slotsNeeded = 0;
+                        if (!currentPlateMap.ContainsKey(pair.src)) slotsNeeded++;
+                        if (!currentPlateMap.ContainsKey(pair.dst) && pair.dst != pair.src) slotsNeeded++;
+
+                        // 本轮盘位不足，开启新一轮
+                        if (currentSlotIndex + slotsNeeded > maxPlatesPerRound)
+                        {
+                            roundPlateTemplateIndexMap.Add(currentPlateMap);
+                            currentPlateMap = new Dictionary<string, int>();
+                            currentSlotIndex = 0;
+                            currentRound++;
+                        }
+
+                        if (!currentPlateMap.ContainsKey(pair.src))
+                        {
+                            currentPlateMap[pair.src] = availablePlateSlots[currentSlotIndex++];
+                            plateRoundMap[pair.src] = currentRound;
+                        }
+                        if (!currentPlateMap.ContainsKey(pair.dst))
+                        {
+                            currentPlateMap[pair.dst] = availablePlateSlots[currentSlotIndex++];
+                            plateRoundMap[pair.dst] = currentRound;
+                        }
                     }
 
-                    // 剩余盘位（排除枪头盒占用的盘位）
-                    var availablePlateTemplateIndexList = Enumerable.Range(0, totalTemplateCount)
-                        .Except(tipIndexList)
-                        .ToList();
+                    if (currentPlateMap.Count > 0)
+                        roundPlateTemplateIndexMap.Add(currentPlateMap);
+                }
 
-                    // 按出现顺序分配盘位
-                    var plateMap = new Dictionary<string, int>();
-                    for (int k = 0; k < currentRoundPlates.Count; k++)
-                        plateMap[currentRoundPlates[k]] = availablePlateTemplateIndexList[k];
+                int maxRound = roundPlateTemplateIndexMap.Count;
 
-                    // 给本轮每行打上round编号
-                    foreach (var ri in currentRoundRows)
-                        rowRound[ri] = currentRound;
-
-                    roundPlateTemplateIndexMap.Add(plateMap);
-                    roundTipTemplateIndexList.Add(tipIndexList);
-                };
+                // 步骤5：给每行分配轮次和枪头盒盘位（游标跨轮连续）
+                var rowRound = new int[dataRows.Count];
+                var rowTipTemplateIndex = new int[dataRows.Count];
+                int globalTipConsumed = 0;
 
                 for (int i = 0; i < dataRows.Count; i++)
                 {
-                    var row = dataRows[i];
+                    // 轮次由源盘名决定（步骤4已保证 src 和 dst 同轮）
+                    rowRound[i] = plateRoundMap[dataRows[i].srcLabel];
 
-                    // 本行需要的新盘名
-                    var newPlates = new List<string>();
-                    if (!currentRoundPlates.Contains(row.srcLabel)) newPlates.Add(row.srcLabel);
-                    if (!currentRoundPlates.Contains(row.dstLabel) && row.dstLabel != row.srcLabel
-                        && !newPlates.Contains(row.dstLabel)) newPlates.Add(row.dstLabel);
-
-                    // 预测加入本行后所需的枪头盒数和总盘位数
-                    int predictedPlateCount = currentRoundPlates.Count + newPlates.Count;
-                    int predictedTipCount = calcTipBoxCount(currentRoundRows.Count + 1);
-                    int predictedTotal = predictedPlateCount + predictedTipCount;
-
-                    if (predictedTotal > totalTemplateCount && currentRoundRows.Count > 0)
-                    {
-                        // 当前行放不下，提交本轮，开启新轮
-                        commitRound();
-                        currentRound++;
-                        currentRoundPlates = new List<string>();
-                        currentRoundRows = new List<int>();
-                        globalTipCandidateUsed = 0; // 每轮枪头盒从候选位重新开始排列
-
-                        // 重新计算新盘名
-                        newPlates.Clear();
-                        if (!currentRoundPlates.Contains(row.srcLabel)) newPlates.Add(row.srcLabel);
-                        if (!currentRoundPlates.Contains(row.dstLabel) && row.dstLabel != row.srcLabel
-                            && !newPlates.Contains(row.dstLabel)) newPlates.Add(row.dstLabel);
-                    }
-
-                    currentRoundPlates.AddRange(newPlates);
-                    currentRoundRows.Add(i);
+                    // 枪头盒盘位：全局游标连续推进，超出候选数时循环取模
+                    int slot = globalTipConsumed / tipBoxCapacity;
+                    int candidateIdx = slot % tipTemplateIndexCandidates.Count;
+                    rowTipTemplateIndex[i] = tipTemplateIndexCandidates[candidateIdx];
+                    globalTipConsumed++;
                 }
-                // 提交最后一轮
-                if (currentRoundRows.Count > 0)
-                    commitRound();
-
-                int maxRound = currentRound;
 
                 // ── 第二遍：逐行生成 Seq ──
-                int dataRowIndex = 0;
-                foreach (var row in dataRows)
+                for (int dataRowIndex = 0; dataRowIndex < dataRows.Count; dataRowIndex++)
                 {
+                    var row = dataRows[dataRowIndex];
                     try
                     {
-                        int round = rowRound[dataRowIndex++];
+                        int round = rowRound[dataRowIndex];
                         var plateMap = roundPlateTemplateIndexMap[round - 1];
-                        var tipIndexList = roundTipTemplateIndexList[round - 1];
-                        // 本轮使用第一个枪头盒盘位（多个枪头盒时TakeAction会自动按顺序取）
-                        int tipTemplateIndex = tipIndexList[0];
+                        int tipTemplateIndex = rowTipTemplateIndex[dataRowIndex];
 
-                        // 解析耗材类型
+                        // 解析源盘耗材类型
                         var srcConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.srcType, false);
                         if (srcConsumableType == null)
                         {
@@ -1845,6 +1813,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                                 (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
                             return false;
                         }
+                        // 解析靶盘耗材类型
                         var dstConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.dstType, false);
                         if (dstConsumableType == null)
                         {
@@ -1853,11 +1822,10 @@ namespace AutoLiquid_GenScript_Single_Handling
                             return false;
                         }
 
-                        // 获取盘位index
                         int sourceTemplateIndex = plateMap[row.srcLabel];
                         int targetTemplateIndex = plateMap[row.dstLabel];
 
-                        // 验证盘位是否已在耗材设置中启用
+                        // 校验盘位是否启用
                         if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
                         {
                             Dispatcher.Invoke(() => MessageBox.Show(
@@ -1886,47 +1854,42 @@ namespace AutoLiquid_GenScript_Single_Handling
                             return false;
                         }
 
-                        // 位置序号（横向1-based）→ 孔位字符串 → HoleIndex
                         var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType,
-                                ConsumableHelper.GetHolePosStr(row.srcPos - 1, srcConsumableType.RowCount, srcConsumableType.ColCount, a1Pos, true));
+                            ConsumableHelper.GetHolePosStr(row.srcPos - 1,
+                                srcConsumableType.RowCount, srcConsumableType.ColCount, a1Pos, true));
                         var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType,
-                                ConsumableHelper.GetHolePosStr(row.dstPos - 1, dstConsumableType.RowCount, dstConsumableType.ColCount, a1Pos, true));
+                            ConsumableHelper.GetHolePosStr(row.dstPos - 1,
+                                dstConsumableType.RowCount, dstConsumableType.ColCount, a1Pos, true));
 
                         seqList.Add(new Seq
                         {
-                            // 枪头（每条记录取新枪头）
                             TipTemplateIndex = tipTemplateIndex,
                             TipTemplateAssign = false,
                             TipTemplateConsumableType = tipTemplateConsumableType,
                             TipChannel = new int[ParamsHelper.HeadList[headUsedIndex].ChannelRow,
-                                                                ParamsHelper.HeadList[headUsedIndex].ChannelCol],
+                                                  ParamsHelper.HeadList[headUsedIndex].ChannelCol],
                             IsTakeTip = true,
 
-                            // 源盘
                             SourceTemplateName = row.srcLabel,
                             SourceTemplateIndex = sourceTemplateIndex,
                             SourceTemplateConsumableType = srcConsumableType,
                             SourceHoleIndexList = new List<HoleIndex> { sourceHoleIndex },
 
-                            // 靶盘（一吸一喷）
                             TargetTemplateName = row.dstLabel,
                             TargetTemplateIndexList = new List<int> { targetTemplateIndex },
                             TargetTemplateConsumableType = dstConsumableType,
                             TargetHoleIndexList = new List<HoleIndex> { targetHoleIndex },
 
-                            // 体积
                             VolumeEachList = new List<Volume> { new Volume { Original = row.volume } },
 
-                            // 轮次
                             Round = round,
-
                             HeadUsedIndex = headUsedIndex,
                         });
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show((string)this.FindResource("Prompt_Excel_Error_1") + row.row
-                                        + (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
+                                      + (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
                         LogHelper.Error(ex.StackTrace);
                         return false;
                     }
@@ -1934,7 +1897,12 @@ namespace AutoLiquid_GenScript_Single_Handling
 
                 try
                 {
-                    Dispatcher.Invoke(() => InitTemplates(1));   // 只渲染第1轮
+                    Dispatcher.Invoke(() =>
+                    {
+                        // 新任务导入时清空跨轮持久状态
+                        tipTemplatePersistDict.Clear();
+                        InitTemplates(1);
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -2021,26 +1989,44 @@ namespace AutoLiquid_GenScript_Single_Handling
                     {
                         // 设置占用盘位
                         ViewUtils.SetTemplateOccupy(headUsedIndex, this.GridTemplateContainer, tipTemplateIndex, tipTemplateConsumableType.TemplateOccupySpan);
-
                         tipTemplateTitleTick++;
-                        var template = new Template
+
+                        ControlTemplateTip controlTemplateTip;
+                        // ── 复用上一轮剩余枪头盒状态 ──
+                        if (tipTemplatePersistDict.TryGetValue(tipTemplateIndex, out var persistedTip))
                         {
-                            Title = (string)this.FindResource("TemplateTips") + tipTemplateTitleTick,
-                            RowCount = tipTemplateConsumableType.RowCount,
-                            ColCount = tipTemplateConsumableType.ColCount,
-                            Step = tipTemplateConsumableType.HoleStep,
-                            A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
-                            Type = ETemplateType.Tip
-                        };
-                        var holeTotalCount = template.RowCount * template.ColCount; // 孔总数
-                        for (var i = 0; i < holeTotalCount; i++)
-                        {
-                            template.Holes.Add(new Hole { Index = i });
+                            // 复用历史控件，保留已使用状态（TipBoxUsedStatus2DArray 和当前位置下拉框选中项）
+                            controlTemplateTip = persistedTip;
+                            controlTemplateTip.mTemplate.Title = (string)this.FindResource("TemplateTips") + tipTemplateTitleTick;
                         }
-                        // 枪头盒是否灵活取枪头（判断所有seq是否含有自定义取枪头数目，如果是，则认为是灵活取枪头）
-                        var tipBoxFlexible = TipHelper.IsTipBoxFlexible(headUsedIndex, seqList, tipTemplateConsumableType);
-                        var controlTemplateTip = new ControlTemplateTip(template, tipTemplateConsumableType) { TipBoxTemplateIndex = tipTemplateIndex, TipBoxFlexible = tipBoxFlexible, HeadUsedIndex = headUsedIndex };
+                        else
+                        {
+                            // 新建枪头盒控件
+                            var template = new Template
+                            {
+                                Title = (string)this.FindResource("TemplateTips") + tipTemplateTitleTick,
+                                RowCount = tipTemplateConsumableType.RowCount,
+                                ColCount = tipTemplateConsumableType.ColCount,
+                                Step = tipTemplateConsumableType.HoleStep,
+                                A1Pos = ParamsHelper.CommonSettingList[0].A1Pos,
+                                Type = ETemplateType.Tip
+                            };
+                            var holeTotalCount = template.RowCount * template.ColCount;
+                            for (var i = 0; i < holeTotalCount; i++)
+                                template.Holes.Add(new Hole { Index = i });
+
+                            var tipBoxFlexible = TipHelper.IsTipBoxFlexible(headUsedIndex, seqList, tipTemplateConsumableType);
+                            controlTemplateTip = new ControlTemplateTip(template, tipTemplateConsumableType)
+                            {
+                                TipBoxTemplateIndex = tipTemplateIndex,
+                                TipBoxFlexible = tipBoxFlexible,
+                                HeadUsedIndex = headUsedIndex
+                            };
+                        }
+
                         tipTemplateDict.Add(tipTemplateIndex, controlTemplateTip);
+                        // 同步写入持久字典（供后续轮次复用）
+                        tipTemplatePersistDict[tipTemplateIndex] = controlTemplateTip;
                         templateCanUse[tipTemplateIndex].Children.Add(controlTemplateTip);
                     }
                 }

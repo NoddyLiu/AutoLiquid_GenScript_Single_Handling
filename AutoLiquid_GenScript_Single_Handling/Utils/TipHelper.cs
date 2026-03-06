@@ -422,7 +422,14 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
                                     tipUsedIndexThisTimeList.Add(currentRowCol);
                                     var isLastColIndex = takeTipLeft2Right ? tipCol == tipBoxUsedStatusCol - 1 : tipCol == 0;
                                     if (takeTipLeft2Right)
-                                        nextTipIndex = isLastColIndex ? (currentRowCol.Row + 1 == tipBoxUsedStatusRow ? -1 : currentRowCol.Row + 1) : (currentRowCol.Col + 1) * tipBoxUsedStatusRow + currentRowCol.Row;
+                                        // nextTipIndex = isLastColIndex ? (currentRowCol.Row + 1 == tipBoxUsedStatusRow ? -1 : currentRowCol.Row + 1) : (currentRowCol.Col + 1) * tipBoxUsedStatusRow + currentRowCol.Row;
+                                        // 到达行末时，跳到下一行首列；整盒用完时返回 -1
+                                        nextTipIndex = isLastColIndex
+                                            ? (currentRowCol.Row + 1 == tipBoxUsedStatusRow
+                                                ? -1
+                                                : (currentRowCol.Row + 1) * tipBoxUsedStatusCol)
+                                            : currentRowCol.Row * tipBoxUsedStatusCol + currentRowCol.Col + 1;
+
                                     else
                                         // nextTipIndex = isLastColIndex ? (tipBoxUsedStatusCol - 1) * tipBoxUsedStatusRow + currentRowCol.Row + 1 : (currentRowCol.Col - 1) * tipBoxUsedStatusRow + currentRowCol.Row;
                                         nextTipIndex = isLastColIndex ? (currentRowCol.Row + 1 == tipBoxUsedStatusRow ? -1 : currentRowCol.Row + 1) : (currentRowCol.Col - 1) * tipBoxUsedStatusRow + currentRowCol.Row;
