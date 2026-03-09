@@ -871,6 +871,7 @@ namespace AutoLiquid_GenScript_Single_Handling
             // 停止
             else if (sender.Equals(this.BtnStop))
             {
+                this.StopCaptureForRun();
                 SetLoadingStatus(ERunStatus.Stop);
                 // 检查移液头状态
                 CheckHeadStatus();
@@ -986,6 +987,7 @@ namespace AutoLiquid_GenScript_Single_Handling
         /// </summary>
         private void RunProcedure(bool replaceTipOverRange)
         {
+            this.StartCaptureForRun();
             int maxRound = seqList.Count == 0 ? 1 : seqList.Max(s => s.Round);
             RunRound(replaceTipOverRange, maxRound);
         }
@@ -1031,6 +1033,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                         });
                         if (!confirmed)
                         {
+                            this.StopCaptureForRun();
                             Dispatcher.Invoke(() => SetLoadingStatus(ERunStatus.Stop));
                             return;
                         }
@@ -1055,6 +1058,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                     }
 
                     // 全部轮次完成
+                    this.StopCaptureForRun();
                     Dispatcher.Invoke(() =>
                     {
                         SetLoadingStatus(ERunStatus.Stop);
@@ -2517,6 +2521,49 @@ namespace AutoLiquid_GenScript_Single_Handling
                 this.StackPanelIntervalRemain.Visibility = Visibility.Collapsed;
                 SetLoadingStatus(ERunStatus.Running, false);
             });
+        }
+
+        /// <summary>
+        /// 在 Run 开始时调用：根据 ParamsHelper.IO 启动摄像/录像
+        /// 把此方法呼叫放在 RunProcedure 开始处（或 Run 开始的合适位置）
+        /// </summary>
+        public void StartCaptureForRun()
+        {
+            try
+            {
+                var excelName = string.IsNullOrWhiteSpace(this.excelFilesNameImported)
+                    ? "UnknownExcel"
+                    : Path.GetFileNameWithoutExtension(this.excelFilesNameImported);
+
+                // 异步启动，避免阻塞 UI 线程
+                Task.Run(() =>
+                {
+                    CameraUtils.Start(excelName, ParamsHelper.IO.ScanPhotoMode, ParamsHelper.IO.TakePhotoDelayMid);
+                });
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("StartCaptureForRun error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 在 Run 结束时调用：停止摄像或触发拍 end 照
+        /// 把此方法呼叫放在 Run 结束（或 Run 被中断/停止）的合适位置
+        /// </summary>
+        public void StopCaptureForRun()
+        {
+            try
+            {
+                Task.Run(() =>
+                {
+                    CameraUtils.Stop();
+                });
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("StopCaptureForRun error: " + ex.Message);
+            }
         }
     }
 }

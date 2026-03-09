@@ -68,24 +68,25 @@ namespace AutoLiquid_GenScript_Single_Handling.UserControls
                 ParamsHelper.IO.ScanPhotoMode= true;
             else if (sender.Equals(this.RBtnModeVideo))
                 ParamsHelper.IO.ScanPhotoMode = false;
+            FileUtils.SaveIO(ParamsHelper.IO);
         }
 
         private void CheckBoxOnChecked(object sender, RoutedEventArgs e)
         {
             if (sender.Equals(this.CheckBoxScanVerify))
-                DataHelper.SaveBool(this.mHeadIndex, true, ref ParamsHelper.IO.ScanAvailable);
+                DataHelper.SaveBool(this.mHeadIndex, true, ref ParamsHelper.IO.ScanAvailable, () => FileUtils.SaveIO(ParamsHelper.IO));
         }
 
         private void CheckBoxOnUnChecked(object sender, RoutedEventArgs e)
         {
             if (sender.Equals(this.CheckBoxScanVerify))
-                DataHelper.SaveBool(this.mHeadIndex, false, ref ParamsHelper.IO.ScanAvailable);
+                DataHelper.SaveBool(this.mHeadIndex, false, ref ParamsHelper.IO.ScanAvailable, () => FileUtils.SaveIO(ParamsHelper.IO));
         }
 
         private void TextBoxOnTextChanged(object sender, TextChangedEventArgs e)
         {
            if (sender.Equals(this.TextBoxTakePhotoDelayMid))
-                DataHelper.SaveInt(this.mHeadIndex, this.TextBoxTakePhotoDelayMid.Text.Trim(), ref ParamsHelper.IO.TakePhotoDelayMid);
+                DataHelper.SaveInt(this.mHeadIndex, this.TextBoxTakePhotoDelayMid.Text.Trim(), ref ParamsHelper.IO.TakePhotoDelayMid, () => FileUtils.SaveIO(ParamsHelper.IO));
         }
     }
 }
