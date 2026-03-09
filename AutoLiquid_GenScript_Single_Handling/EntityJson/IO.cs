@@ -83,5 +83,15 @@ namespace AutoLiquid_GenScript_Single_Handling.EntityJson
         public string WarningLightYellowOpenCmd = "AO21";
         // 警示灯红色开指令
         public string WarningLightRedOpenCmd = "AO31";
+
+        /*
+         * 扫码验证盘位
+         */
+        // 是否启用扫码验证
+        public bool ScanAvailable = true;
+        // 拍照模式或者视频模式
+        public bool ScanPhotoMode = true;
+        // 拍照模式下，中间延时拍照时间（秒）
+        public int TakePhotoDelayMid = 60;
     }
 }

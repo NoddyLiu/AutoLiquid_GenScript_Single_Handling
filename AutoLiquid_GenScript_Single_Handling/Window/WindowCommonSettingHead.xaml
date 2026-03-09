@@ -57,6 +57,13 @@
                     </GroupBox.Header>
                 </GroupBox>
 
+                <!--验证设置-->
+                <GroupBox x:Name="GroupBoxVerify" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
+                    <GroupBox.Header>
+                        <Label Content="{StaticResource Verify}" FontSize="{StaticResource SettingGroupBoxTitleFontSize}" Foreground="White"/>
+                    </GroupBox.Header>
+                </GroupBox>
+
                 <!--推出盘位-->
                 <GroupBox x:Name="GroupBoxLaunchPlate" BorderThickness="{StaticResource GroupBoxBorderThickness}" Margin="0,5,0,0">
                     <GroupBox.Header>

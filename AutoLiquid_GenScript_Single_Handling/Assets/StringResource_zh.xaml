@@ -245,6 +245,21 @@
     <s:String x:Key="DisVolume1">喷液体积1</s:String>
     <s:String x:Key="DisVolume2">喷液体积2</s:String>
     <s:String x:Key="DisAll">喷出所有</s:String>
+    <s:String x:Key="BarcodeVerifyTitle">轮次耗材扫码确认</s:String>
+    <s:String x:Key="BarcodeVerifyHint">请使用USB扫码枪逐一扫描各盘位条形码进行确认（枪头盒无需扫码）</s:String>
+    <s:String x:Key="BarcodeVerifyRoundInfo">第 {0} / {1} 轮</s:String>
+    <s:String x:Key="BarcodeVerifyWaiting">等待扫码...</s:String>
+    <s:String x:Key="BarcodeVerifyTipBoxNoScan">无需扫码</s:String>
+    <s:String x:Key="BarcodeVerifyScanPrompt">请扫描【{0}】，期望条形码：{1}</s:String>
+    <s:String x:Key="BarcodeVerifyExpected">期望：</s:String>
+    <s:String x:Key="BarcodeVerifyAllPassed">✔ 所有盘位扫码验证通过，可点击"确认"继续运行！</s:String>
+    <s:String x:Key="BarcodeVerifyConfirm">确认运行</s:String>
+    <s:String x:Key="Verify">验证设置</s:String>
+    <s:String x:Key="ScanVerify">扫码验证</s:String>
+    <s:String x:Key="ModePhoto">拍照模式</s:String>
+    <s:String x:Key="ModeVideo">视频模式</s:String>
+    <s:String x:Key="DelayMid">中间延时</s:String>
+    <s:String x:Key="TakePhoto">秒拍照一张</s:String>
 
     <!--提示-->
     <s:String x:Key="Prompt">提示</s:String>

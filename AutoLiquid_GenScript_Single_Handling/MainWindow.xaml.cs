@@ -1011,11 +1011,23 @@ namespace AutoLiquid_GenScript_Single_Handling
                         Dispatcher.Invoke(() =>
                         {
                             InitTemplates(currentRound);
-                            confirmed = MessageBox.Show(
-                                BuildRoundPrompt(currentRound, maxRound),
-                                (string)this.FindResource("Prompt"),
-                                MessageBoxButton.OKCancel,
-                                MessageBoxImage.Warning) == MessageBoxResult.OK;
+                            if (ParamsHelper.IO.ScanAvailable)
+                            {
+                                var verifyWnd = new WindowBarcodeVerify(seqList, currentRound, maxRound)
+                                {
+                                    Owner = this
+                                };
+                                verifyWnd.ShowDialog();
+                                confirmed = verifyWnd.IsConfirmed;
+                            }
+                            else
+                            {
+                                confirmed = MessageBox.Show(
+                                    BuildRoundPrompt(currentRound, maxRound),
+                                    (string)this.FindResource("Prompt"),
+                                    MessageBoxButton.OKCancel,
+                                    MessageBoxImage.Warning) == MessageBoxResult.OK;
+                            }
                         });
                         if (!confirmed)
                         {

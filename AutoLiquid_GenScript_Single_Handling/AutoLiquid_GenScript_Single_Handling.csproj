@@ -115,6 +115,9 @@
     <Compile Include="UserControls\ControlSettingLaunchPlate.xaml.cs">
       <DependentUpon>ControlSettingLaunchPlate.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UserControls\ControlSettingVerify.xaml.cs">
+      <DependentUpon>ControlSettingVerify.xaml</DependentUpon>
+    </Compile>
     <Compile Include="UserControls\ControlSettingPosDebug.xaml.cs">
       <DependentUpon>ControlSettingPosDebug.xaml</DependentUpon>
     </Compile>
@@ -167,6 +170,9 @@
     <Compile Include="Utils\WindowUtils.cs" />
     <Compile Include="Window\WindowAbout.xaml.cs">
       <DependentUpon>WindowAbout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Window\WindowBarcodeVerify.xaml.cs">
+      <DependentUpon>WindowBarcodeVerify.xaml</DependentUpon>
     </Compile>
     <Compile Include="Window\WindowChangeGroupTitle.xaml.cs">
       <DependentUpon>WindowChangeGroupTitle.xaml</DependentUpon>
@@ -244,6 +250,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="UserControls\ControlSettingVerify.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="UserControls\ControlSettingPosDebug.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -299,6 +309,10 @@
     <Page Include="Window\WindowAbout.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Window\WindowBarcodeVerify.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Window\WindowChangeGroupTitle.xaml">
       <Generator>MSBuild:Compile</Generator>

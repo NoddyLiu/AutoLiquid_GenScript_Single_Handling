@@ -97,6 +97,11 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 this.GroupBoxSpeed.Visibility = Visibility.Collapsed;
 
             /**
+             * 验证设置
+             */
+            this.GroupBoxVerify.Content = new ControlSettingVerify(this.mHeadIndex);
+
+            /**
              * 推出盘位
              */
             this.GroupBoxLaunchPlate.Content = new ControlSettingLaunchPlate(this.mHeadIndex);

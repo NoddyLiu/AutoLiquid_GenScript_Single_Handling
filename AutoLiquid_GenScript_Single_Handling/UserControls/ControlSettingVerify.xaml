@@ -1,0 +1,27 @@
+﻿<UserControl x:Class="AutoLiquid_GenScript_Single_Handling.UserControls.ControlSettingVerify"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AutoLiquid_GenScript_Single_Handling.UserControls"
+             xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+             xmlns:system="clr-namespace:System;assembly=mscorlib"
+             mc:Ignorable="d" 
+             Background="White">
+
+    <Grid>
+        <StackPanel Orientation="Vertical" Margin="20,5,0,0">
+            <!--是否启用扫码验证-->
+            <CheckBox x:Name="CheckBoxScanVerify" Content="{StaticResource ScanVerify}" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+            <StackPanel Orientation="Vertical" Margin="0,5">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="RBtnModePhoto" GroupName="Mode" Content="{StaticResource ModePhoto}"  FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" IsChecked="True"/>
+                    <Label HorizontalContentAlignment="Center" Content="{StaticResource DelayMid}" FontSize="{StaticResource MahApps.Font.Size.Default}" Margin="10,0,0,0"/>
+                    <TextBox x:Name="TextBoxTakePhotoDelayMid" Width="{StaticResource SettingValueWidth}" HorizontalContentAlignment="Center" Text="0" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                    <Label Content="{StaticResource TakePhoto}" HorizontalContentAlignment="Center" FontSize="{StaticResource MahApps.Font.Size.Default}"/>
+                </StackPanel>
+                <RadioButton x:Name="RBtnModeVideo" GroupName="Mode" Content="{StaticResource ModeVideo}" FontSize="{StaticResource MahApps.Font.Size.Default}" VerticalAlignment="Center" Margin="0,5,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>
