@@ -2524,6 +2524,63 @@ namespace AutoLiquid_GenScript_Single_Handling
         }
 
         /// <summary>
+        /// 保存主界面截图到 Documents\<ProcessesName>\Records\<yyyy-MM-dd>\
+        /// 文件名：{excelBaseName}_截图_{timestamp}.png
+        /// </summary>
+        private void SaveMainWindowScreenshot()
+        {
+            try
+            {
+                var excelBase = string.IsNullOrWhiteSpace(this.excelFilesNameImported)
+                    ? "UnknownExcel"
+                    : Path.GetFileNameWithoutExtension(this.excelFilesNameImported);
+
+                var recordsDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    (string)Application.Current.FindResource("ProcessesName"),
+                    "Records",
+                    DateTime.Now.ToString("yyyy-MM-dd"));
+
+                Directory.CreateDirectory(recordsDir);
+
+                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+                var fileName = $"{excelBase}_截图_{timestamp}.png";
+                var fullPath = Path.Combine(recordsDir, fileName);
+
+                // 截图需在 UI 线程执行 Rendering
+                this.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        // 获取窗口的可呈现大小（包括窗口客户区）
+                        var width = (int)Math.Max(1, this.ActualWidth);
+                        var height = (int)Math.Max(1, this.ActualHeight);
+
+                        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+                        // Render the window (this) visual. 若窗口中存在 Popup/TopMost 元素，它们可能不会被包含。
+                        rtb.Render(this);
+
+                        var encoder = new PngBitmapEncoder();
+                        encoder.Frames.Add(BitmapFrame.Create(rtb));
+
+                        using (var fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write))
+                        {
+                            encoder.Save(fs);
+                        }
+                    }
+                    catch (Exception exInner)
+                    {
+                        LogHelper.Error("SaveMainWindowScreenshot render/save error: " + exInner.Message);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("SaveMainWindowScreenshot error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// 在 Run 开始时调用：根据 ParamsHelper.IO 启动摄像/录像
         /// 把此方法呼叫放在 RunProcedure 开始处（或 Run 开始的合适位置）
         /// </summary>
@@ -2535,7 +2592,10 @@ namespace AutoLiquid_GenScript_Single_Handling
                     ? "UnknownExcel"
                     : Path.GetFileNameWithoutExtension(this.excelFilesNameImported);
 
-                // 异步启动，避免阻塞 UI 线程
+                // 1) 先保存主界面截图（同步完成）
+                SaveMainWindowScreenshot();
+
+                // 2) 异步启动，避免阻塞 UI 线程
                 Task.Run(() =>
                 {
                     CameraUtils.Start(excelName, ParamsHelper.IO.ScanPhotoMode, ParamsHelper.IO.TakePhotoDelayMid);
