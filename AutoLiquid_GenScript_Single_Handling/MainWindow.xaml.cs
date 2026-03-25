@@ -1612,16 +1612,16 @@ namespace AutoLiquid_GenScript_Single_Handling
         }
 
         /// <summary>
-        /// 解析Excel数据（新模板：B~H列）
-        /// 列映射：B=源盘名, C=源盘类型, D=源位置, E=靶盘名, F=靶盘类型, G=靶位置, H=体积
+        /// 解析Excel数据（新模板：A~H列）
+        /// 列映射：A=引物名称, B=源盘名, C=源盘类型, D=源位置, E=靶盘名, F=靶盘类型, G=靶位置, H=体积
         /// </summary>
         /// <summary>
-        /// 解析Excel数据（新模板：B~H列，第2行起数据）
-        /// B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
+        /// 解析Excel数据（新模板：A~H列，第2行起数据）
+        /// A=引物名称, B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
         /// </summary>
         /// <summary>
-        /// 解析Excel数据（新模板：B~H列，第2行起数据）
-        /// B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
+        /// 解析Excel数据（新模板：A~H列，第2行起数据）
+        /// A=引物名称, B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
         /// </summary>
         private bool ParseDataFromExcel(string filePath)
         {
@@ -1647,6 +1647,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                 seqList.Clear();
 
                 // ── Excel列常量（1-based）──
+                const int primerLabelCol = 1;  // A: primerlabel（引物名称，EP管架时逐管扫码用）
                 const int srcLabelCol = 2;  // B: Source Labware Label（源盘耗材名）
                 const int srcTypeCol = 3;  // C: Source Labware Type（源盘耗材类型）
                 const int srcPosCol = 4;  // D: Source Position（源位置序号，1-based）
@@ -1674,7 +1675,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                 int tipBoxCapacity = tipTemplateConsumableType.RowCount * tipTemplateConsumableType.ColCount;
 
                 // ── 第一遍：收集所有有效数据行 ──
-                var dataRows = new List<(int row, string srcLabel, string srcType,
+                var dataRows = new List<(int row, string primerLabel, string srcLabel, string srcType,
                     int srcPos, string dstLabel, string dstType, int dstPos, decimal volume)>();
                 for (int r = 2; ; r++)
                 {
@@ -1689,9 +1690,10 @@ namespace AutoLiquid_GenScript_Single_Handling
                     if (string.IsNullOrEmpty(srcPosStr) || string.IsNullOrEmpty(dstPosStr) || string.IsNullOrEmpty(volStr))
                         continue;
 
+                    var primerLabel = ws.Range[r, primerLabelCol].Text?.Trim() ?? "";  // A列，允许为空
                     var srcType = ws.Range[r, srcTypeCol].Text?.Trim() ?? "";
                     var dstType = ws.Range[r, dstTypeCol].Text?.Trim() ?? "";
-                    dataRows.Add((r, srcLabel, srcType,
+                    dataRows.Add((r, primerLabel, srcLabel, srcType,
                         int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
                 }
 
@@ -1900,6 +1902,8 @@ namespace AutoLiquid_GenScript_Single_Handling
 
                             Round = round,
                             HeadUsedIndex = headUsedIndex,
+
+                            EpTubePrimerLabel = row.primerLabel,   // ← 新增
                         });
                     }
                     catch (Exception ex)

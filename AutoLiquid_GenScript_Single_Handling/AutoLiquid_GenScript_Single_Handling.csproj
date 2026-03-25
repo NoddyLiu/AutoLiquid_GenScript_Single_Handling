@@ -196,6 +196,9 @@
     <Compile Include="Window\WindowCommonSettingHead.xaml.cs">
       <DependentUpon>WindowCommonSettingHead.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Window\WindowEpRackScan.xaml.cs">
+      <DependentUpon>WindowEpRackScan.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Window\WindowLogin.xaml.cs">
       <DependentUpon>WindowLogin.xaml</DependentUpon>
     </Compile>
@@ -337,6 +340,10 @@
     <Page Include="Window\WindowCommonSettingHead.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Window\WindowEpRackScan.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Window\WindowLogin.xaml">
       <Generator>MSBuild:Compile</Generator>

@@ -129,5 +129,10 @@ namespace AutoLiquid_GenScript_Single_Handling.EntityCommon
 
         // 是否泵分液
         public bool IsPumpLiquid = false;
+
+        // ── EP管架引物名称（A列，每行对应源盘或靶盘某个孔位的EP管引物名称）──
+        // 当源盘或靶盘为EP管架（GroupName含"ep"）时，此字段存放该行对应的引物名称（primerlabel）
+        // 扫码时作为该孔EP管的期望条码
+        public string EpTubePrimerLabel = "";
     }
 }

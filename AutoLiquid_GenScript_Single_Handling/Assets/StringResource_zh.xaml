@@ -260,6 +260,13 @@
     <s:String x:Key="ModeVideo">视频模式</s:String>
     <s:String x:Key="DelayMid">中间延时</s:String>
     <s:String x:Key="TakePhoto">秒拍照一张</s:String>
+    <s:String x:Key="EpRackLabel">【EP管架-逐管扫码】</s:String>
+    <s:String x:Key="EpRackScanTitle">EP管架逐管扫码确认</s:String>
+    <s:String x:Key="EpRackScanHint">请对【{0}】中的每支EP管逐一扫码（核对引物名称）</s:String>
+    <s:String x:Key="EpRackScanPrompt">请扫描孔位【{0}】的EP管，期望引物名称：{1}</s:String>
+    <s:String x:Key="EpRackScanProgress">已完成 {0} / {1} 支</s:String>
+    <s:String x:Key="EpRackScanAllPassed">✔ EP管架所有管扫码通过</s:String>
+    <s:String x:Key="EpRackScanInProgress">【{0}】EP管架逐管扫码中...</s:String>
 
     <!--提示-->
     <s:String x:Key="Prompt">提示</s:String>

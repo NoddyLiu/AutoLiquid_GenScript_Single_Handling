@@ -1,4 +1,5 @@
 ﻿using AutoLiquid_GenScript_Single_Handling.EntityCommon;
+using AutoLiquid_GenScript_Single_Handling.EntityJson;
 using AutoLiquid_GenScript_Single_Handling.Utils;
 using ControlzEx.Standard;
 using MahApps.Metro.Controls;
@@ -22,7 +23,7 @@ using System.Windows.Shapes;
 namespace AutoLiquid_GenScript_Single_Handling.Window
 {
     /// <summary>
-    ///  扫码确认盘位信息窗口
+    ///  扫码确认盘位信息窗口（主级框）
     /// </summary>
     public partial class WindowBarcodeVerify : MetroWindow
     {
@@ -44,35 +45,40 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         private const int WM_SYSKEYDOWN = 0x0104;
         private const int VK_RETURN = 0x0D;
         private const int VK_BACK = 0x08;
-        // 忽略的修饰键 VK 值
         private static readonly HashSet<int> _ignoredVk = new HashSet<int>
         {
-            0x10, 0x11, 0x12,       // Shift, Ctrl, Alt
-            0x14,                   // CapsLock
-            0x5B, 0x5C,             // LWin, RWin
-            0xA0, 0xA1,             // LShift, RShift
-            0xA2, 0xA3,             // LCtrl, RCtrl
-            0xA4, 0xA5,             // LAlt, RAlt
-            0x09,                   // Tab
-            0x1B,                   // Escape
+            0x10, 0x11, 0x12,
+            0x14,
+            0x5B, 0x5C,
+            0xA0, 0xA1,
+            0xA2, 0xA3,
+            0xA4, 0xA5,
+            0x09,
+            0x1B,
         };
 
         // ── 数据模型 ──
 
-        /// <summary>盘位扫码项（枪头盒不需要扫码）</summary>
+        /// <summary>盘位扫码项</summary>
         public class SlotScanItem
         {
-            /// <summary>盘位Index（0-based）</summary>
             public int TemplateIndex { get; set; }
-            /// <summary>显示标题（如"源盘1"、"靶盘2"）</summary>
             public string Title { get; set; }
-            /// <summary>期望条形码（即盘名）</summary>
             public string ExpectedBarcode { get; set; }
-            /// <summary>是否为枪头盒（枪头盒不扫码，显示灰色）</summary>
+            /// <summary>是否为枪头盒（不扫码）</summary>
             public bool IsTipBox { get; set; }
+            /// <summary>是否为EP管架（需弹出次级框逐管扫码）</summary>
+            public bool IsEpRack { get; set; }
+            /// <summary>EP管架耗材配置</summary>
+            public Consumable EpRackConsumable { get; set; }
+            /// <summary>
+            /// EP管架各孔位对应的引物名称，按孔Index（0-based）顺序存储。
+            /// 空字符串 = 该孔无对应Excel行，无需扫码。
+            /// 源盘/靶盘均用此字段。
+            /// </summary>
+            public List<string> EpTubePrimerLabels { get; set; } = new List<string>();
             /// <summary>扫码结果：null=未扫，true=正确，false=错误</summary>
             public bool? ScanResult { get; set; }
-            /// <summary>已扫入的条形码文本</summary>
             public string ScannedBarcode { get; set; }
         }
 
@@ -83,37 +89,20 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         private readonly int _currentRound;
         private readonly int _maxRound;
 
-        /// <summary>所有需要扫码的盘位项（按 TemplateIndex 索引）</summary>
         private readonly Dictionary<int, SlotScanItem> _scanItems = new Dictionary<int, SlotScanItem>();
-
-        /// <summary>UI中每个盘位对应的Border控件</summary>
         private readonly Dictionary<int, Border> _slotBorders = new Dictionary<int, Border>();
-        /// <summary>UI中每个盘位对应的状态TextBlock</summary>
         private readonly Dictionary<int, TextBlock> _slotStatusTexts = new Dictionary<int, TextBlock>();
 
-        /// <summary>当前等待扫码的盘位Index队列（按TemplateIndex升序）</summary>
         private readonly Queue<int> _pendingQueue = new Queue<int>();
-
-        /// <summary>当前正在等待扫码的盘位Index，-1表示全部完成</summary>
         private int _currentScanIndex = -1;
 
-        /// <summary>USB扫码枪输入缓冲区（Enter结尾提交）</summary>
         private readonly StringBuilder _inputBuffer = new StringBuilder();
-
-        /// <summary>ComponentDispatcher 是否已注册，防止重复注册/多次注销</summary>
         private bool _hookRegistered = false;
 
-        /// <summary>窗口是否已确认（点击确认按钮）</summary>
         public bool IsConfirmed { get; private set; } = false;
 
         // ── 构造 ──
 
-        /// <summary>
-        /// 创建扫码验证窗体
-        /// </summary>
-        /// <param name="seqList">全部 Seq 列表</param>
-        /// <param name="round">当前轮次（1-based）</param>
-        /// <param name="maxRound">最大轮次</param>
         public WindowBarcodeVerify(List<Seq> seqList, int round, int maxRound)
         {
             InitializeComponent();
@@ -123,7 +112,8 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             _currentRound = round;
             _maxRound = maxRound;
 
-            var logoFile = AppDomain.CurrentDomain.BaseDirectory + System.IO.Path.DirectorySeparatorChar + "logo.png";
+            var logoFile = AppDomain.CurrentDomain.BaseDirectory
+                           + System.IO.Path.DirectorySeparatorChar + "logo.png";
             if (File.Exists(logoFile))
                 this.Icon = new BitmapImage(new Uri(logoFile));
 
@@ -139,7 +129,6 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             this.BtnConfirm.Click += (s, e) => { IsConfirmed = true; this.Close(); };
             this.BtnCancel.Click += (s, e) => { IsConfirmed = false; this.Close(); };
 
-            // 仅在窗口初始化完成后注册一次，关闭时注销一次
             this.SourceInitialized += OnSourceInitialized;
             this.Closed += OnClosed;
         }
@@ -162,20 +151,14 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             }
         }
 
-        // ── 消息预处理（在所有 HwndSourceHook 之前，包括 MahApps） ──
+        // ── 消息预处理 ──
         private void OnThreadPreprocessMessage(ref MSG msg, ref bool handled)
         {
-            // 仅当本窗口可见时处理，避免在隐藏或已关闭状态下误处理
-            if (!this.IsVisible)
-                return;
-
-            // 仅关心按键按下消息
-            if (msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN)
-                return;
+            if (!this.IsVisible) return;
+            if (msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN) return;
 
             int vk = msg.wParam.ToInt32();
 
-            // Enter：提交缓冲区
             if (vk == VK_RETURN)
             {
                 var barcode = _inputBuffer.ToString().Trim();
@@ -186,7 +169,6 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 return;
             }
 
-            // Backspace：删除最后一个字符
             if (vk == VK_BACK)
             {
                 if (_inputBuffer.Length > 0)
@@ -195,11 +177,8 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 return;
             }
 
-            // 忽略修饰键本身
-            if (_ignoredVk.Contains(vk))
-                return;
+            if (_ignoredVk.Contains(vk)) return;
 
-            // 将虚拟键翻译成字符（尊重 CapsLock/Shift/键盘布局）
             var ch = VkToChar((uint)vk);
             if (ch != null)
             {
@@ -208,20 +187,13 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             }
         }
 
-        /// <summary>
-        /// 将 Win32 Virtual-Key 转为字符，通过 GetKeyboardState + ToUnicode 实现，
-        /// 正确处理 CapsLock、Shift、任意键盘布局。
-        /// </summary>
         private static string VkToChar(uint vk)
         {
-            var scanCode = MapVirtualKey(vk, 0 /* MAPVK_VK_TO_VSC */);
+            var scanCode = MapVirtualKey(vk, 0);
             var keyboardState = new byte[256];
             if (!GetKeyboardState(keyboardState)) return null;
-
             var sb = new StringBuilder(4);
             int count = ToUnicode(vk, scanCode, keyboardState, sb, sb.Capacity, 0);
-
-            // count == 1：正常字符；count == -1：死键（忽略）；count == 0：无映射
             return count == 1 ? sb.ToString() : null;
         }
 
@@ -231,7 +203,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         {
             var roundSeqs = seqList.Where(s => s.Round == round && !s.IsCmdOnly).ToList();
 
-            // 枪头盒盘位：只显示，不扫码
+            // ── 枪头盒（只显示，不扫码）──
             var tipTick = 0;
             foreach (var seq in roundSeqs)
             {
@@ -251,12 +223,17 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 }
             }
 
-            // 源盘
+            // ── 源盘 ──
             var srcTick = 0;
             foreach (var seq in roundSeqs)
             {
                 if (seq.IsPumpLiquid) continue;
                 var srcIdx = seq.SourceTemplateIndex;
+
+                bool isEp = seq.SourceTemplateConsumableType != null &&
+                            seq.SourceTemplateConsumableType.GroupName
+                                .IndexOf("ep", StringComparison.OrdinalIgnoreCase) >= 0;
+
                 if (!_scanItems.ContainsKey(srcIdx))
                 {
                     srcTick++;
@@ -266,12 +243,24 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                         Title = (string)Application.Current.FindResource("TemplateSource") + srcTick,
                         ExpectedBarcode = seq.SourceTemplateName,
                         IsTipBox = false,
+                        IsEpRack = isEp,
+                        EpRackConsumable = isEp ? seq.SourceTemplateConsumableType : null,
                         ScanResult = null
                     };
                 }
+
+                // 收集源盘EP管架各孔的引物名称
+                if (isEp && !string.IsNullOrEmpty(seq.EpTubePrimerLabel)
+                    && seq.SourceHoleIndexList.Count > 0)
+                {
+                    int holeIdx = seq.SourceHoleIndexList[0].OriIndex;
+                    var labels = _scanItems[srcIdx].EpTubePrimerLabels;
+                    while (labels.Count <= holeIdx) labels.Add("");
+                    labels[holeIdx] = seq.EpTubePrimerLabel;
+                }
             }
 
-            // 靶盘
+            // ── 靶盘 ──
             var dstTick = 0;
             var dstSeen = new HashSet<int>();
             foreach (var seq in roundSeqs)
@@ -280,6 +269,11 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 for (var i = 0; i < seq.TargetTemplateIndexList.Count; i++)
                 {
                     var dstIdx = seq.TargetTemplateIndexList[i];
+
+                    bool isEp = seq.TargetTemplateConsumableType != null &&
+                                seq.TargetTemplateConsumableType.GroupName
+                                    .IndexOf("ep", StringComparison.OrdinalIgnoreCase) >= 0;
+
                     if (!_scanItems.ContainsKey(dstIdx) && !dstSeen.Contains(dstIdx))
                     {
                         dstTick++;
@@ -290,8 +284,20 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                             Title = (string)Application.Current.FindResource("TemplateTarget") + dstTick,
                             ExpectedBarcode = seq.TargetTemplateName,
                             IsTipBox = false,
+                            IsEpRack = isEp,
+                            EpRackConsumable = isEp ? seq.TargetTemplateConsumableType : null,
                             ScanResult = null
                         };
+                    }
+
+                    // 收集靶盘EP管架各孔的引物名称
+                    if (isEp && !string.IsNullOrEmpty(seq.EpTubePrimerLabel)
+                        && seq.TargetHoleIndexList.Count > i)
+                    {
+                        int holeIdx = seq.TargetHoleIndexList[i].OriIndex;
+                        var labels = _scanItems[dstIdx].EpTubePrimerLabels;
+                        while (labels.Count <= holeIdx) labels.Add("");
+                        labels[holeIdx] = seq.EpTubePrimerLabel;
                     }
                 }
             }
@@ -350,7 +356,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
                     if (item != null)
                     {
-                        // 标题（枪头盒1 / 源盘1 / 靶盘1）
+                        // 盘位标题
                         panel.Children.Add(new TextBlock
                         {
                             Text = item.Title,
@@ -363,7 +369,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
                         if (!item.IsTipBox)
                         {
-                            // 期望条形码
+                            // 期望条形码（盘名）
                             panel.Children.Add(new TextBlock
                             {
                                 Text = item.ExpectedBarcode,
@@ -373,6 +379,18 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                                 TextWrapping = TextWrapping.Wrap,
                                 TextAlignment = TextAlignment.Center
                             });
+
+                            // EP管架标记
+                            if (item.IsEpRack)
+                            {
+                                panel.Children.Add(new TextBlock
+                                {
+                                    Text = (string)Application.Current.FindResource("EpRackLabel"),
+                                    FontSize = 10,
+                                    Foreground = Brushes.DarkOrange,
+                                    HorizontalAlignment = HorizontalAlignment.Center
+                                });
+                            }
 
                             // 扫码状态文本
                             var statusText = new TextBlock
@@ -387,7 +405,6 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                         }
                         else
                         {
-                            // 枪头盒：显示"无需扫码"
                             panel.Children.Add(new TextBlock
                             {
                                 Text = (string)Application.Current.FindResource("BarcodeVerifyTipBoxNoScan"),
@@ -414,7 +431,6 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         private void InitQueue()
         {
             _pendingQueue.Clear();
-            // 只把需要扫码（非枪头盒）的盘位按TemplateIndex升序入队
             foreach (var idx in _scanItems.Keys.OrderBy(k => k))
             {
                 if (!_scanItems[idx].IsTipBox)
@@ -428,7 +444,53 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             if (_pendingQueue.Count > 0)
             {
                 _currentScanIndex = _pendingQueue.Dequeue();
-                HighlightCurrentSlot();
+
+                // EP管架：弹出次级扫码框
+                if (_scanItems.TryGetValue(_currentScanIndex, out var item) && item.IsEpRack)
+                {
+                    HighlightCurrentSlot();
+                    RefreshStatusText();
+
+                    var epWnd = new WindowEpRackScan(
+                        item.EpRackConsumable,
+                        item.Title,
+                        item.EpTubePrimerLabels)
+                    {
+                        Owner = this
+                    };
+                    epWnd.ShowDialog();
+
+                    if (!epWnd.IsConfirmed)
+                    {
+                        // 次级框取消 → 主框整体取消
+                        IsConfirmed = false;
+                        this.Close();
+                        return;
+                    }
+
+                    // 次级框全部通过，标绿盘位
+                    item.ScanResult = true;
+                    if (_slotBorders.TryGetValue(_currentScanIndex, out var border))
+                    {
+                        border.Background = new SolidColorBrush(Color.FromRgb(198, 239, 206));
+                        border.BorderBrush = Brushes.Green;
+                        border.BorderThickness = new Thickness(2);
+                    }
+                    if (_slotStatusTexts.TryGetValue(_currentScanIndex, out var statusText))
+                    {
+                        statusText.Text = (string)Application.Current.FindResource("EpRackScanAllPassed");
+                        statusText.Foreground = Brushes.Green;
+                    }
+
+                    // 继续下一个
+                    AdvanceQueue();
+                    RefreshStatusText();
+                }
+                else
+                {
+                    // 普通盘位：高亮等待键盘扫码枪输入
+                    HighlightCurrentSlot();
+                }
             }
             else
             {
@@ -439,15 +501,10 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
         private void HighlightCurrentSlot()
         {
-            // 将当前待扫盘位边框高亮为橙色
             foreach (var kv in _slotBorders)
             {
-                kv.Value.BorderBrush = kv.Key == _currentScanIndex
-                    ? Brushes.Orange
-                    : Brushes.Gray;
-                kv.Value.BorderThickness = kv.Key == _currentScanIndex
-                    ? new Thickness(2)
-                    : new Thickness(1);
+                kv.Value.BorderBrush = kv.Key == _currentScanIndex ? Brushes.Orange : Brushes.Gray;
+                kv.Value.BorderThickness = kv.Key == _currentScanIndex ? new Thickness(2) : new Thickness(1);
             }
         }
 
@@ -459,12 +516,11 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             item.ScannedBarcode = barcode;
             item.ScanResult = string.Equals(barcode, item.ExpectedBarcode, StringComparison.Ordinal);
 
-            // 更新UI
             if (_slotBorders.TryGetValue(_currentScanIndex, out var border))
             {
                 border.Background = item.ScanResult == true
-                    ? new SolidColorBrush(Color.FromRgb(198, 239, 206))   // 绿色背景
-                    : new SolidColorBrush(Color.FromRgb(255, 199, 199));  // 红色背景
+                    ? new SolidColorBrush(Color.FromRgb(198, 239, 206))
+                    : new SolidColorBrush(Color.FromRgb(255, 199, 199));
                 border.BorderBrush = item.ScanResult == true ? Brushes.Green : Brushes.Red;
                 border.BorderThickness = new Thickness(2);
             }
@@ -487,19 +543,17 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
             if (item.ScanResult == true)
             {
-                // 扫码正确，推进到下一个
                 AdvanceQueue();
                 RefreshStatusText();
             }
             else
             {
-                // 扫码错误：当前盘位重新等待，继续扫
                 HighlightCurrentSlot();
                 RefreshStatusText();
             }
         }
 
-        // ── 检查是否全部通过 ──
+        // ── 检查全部通过 ──
 
         private void CheckAllPassed()
         {
@@ -519,10 +573,21 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         {
             if (_currentScanIndex >= 0 && _scanItems.TryGetValue(_currentScanIndex, out var item))
             {
-                this.TextBlockStatus.Text = string.Format(
-                    (string)Application.Current.FindResource("BarcodeVerifyScanPrompt"),
-                    item.Title, item.ExpectedBarcode);
-                this.TextBlockStatus.Foreground = Brushes.DimGray;
+                // EP管架盘位在次级框弹出期间，主框提示"EP管架逐管扫码中"
+                if (item.IsEpRack)
+                {
+                    this.TextBlockStatus.Text = string.Format(
+                        (string)Application.Current.FindResource("EpRackScanInProgress"),
+                        item.Title);
+                    this.TextBlockStatus.Foreground = Brushes.DarkOrange;
+                }
+                else
+                {
+                    this.TextBlockStatus.Text = string.Format(
+                        (string)Application.Current.FindResource("BarcodeVerifyScanPrompt"),
+                        item.Title, item.ExpectedBarcode);
+                    this.TextBlockStatus.Foreground = Brushes.DimGray;
+                }
             }
         }
     }
