@@ -119,7 +119,6 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
             BuildScanItems(seqList, round);
             BuildLayoutGrid();
-            InitQueue();
             RefreshStatusText();
 
             this.TextBlockRoundInfo.Text = string.Format(
@@ -129,8 +128,16 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             this.BtnConfirm.Click += (s, e) => { IsConfirmed = true; this.Close(); };
             this.BtnCancel.Click += (s, e) => { IsConfirmed = false; this.Close(); };
 
+            // ↓ 窗口完全显示后再启动队列，避免 Owner 未显示的报错
+            this.Loaded += OnLoaded;
             this.SourceInitialized += OnSourceInitialized;
             this.Closed += OnClosed;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            this.Loaded -= OnLoaded; // 只执行一次
+            InitQueue();
         }
 
         private void OnSourceInitialized(object sender, EventArgs e)
