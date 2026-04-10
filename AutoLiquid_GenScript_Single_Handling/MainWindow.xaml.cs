@@ -1844,33 +1844,33 @@ namespace AutoLiquid_GenScript_Single_Handling
                         int targetTemplateIndex = plateMap[row.dstLabel];
 
                         // 校验盘位是否启用
-                        if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
-                        {
-                            Dispatcher.Invoke(() => MessageBox.Show(
-                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                                + srcConsumableType.GroupName
-                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                                + (sourceTemplateIndex + 1)));
-                            return false;
-                        }
-                        if (!dstConsumableType.TemplateAvailableList[targetTemplateIndex])
-                        {
-                            Dispatcher.Invoke(() => MessageBox.Show(
-                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                                + dstConsumableType.GroupName
-                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                                + (targetTemplateIndex + 1)));
-                            return false;
-                        }
-                        if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
-                        {
-                            Dispatcher.Invoke(() => MessageBox.Show(
-                                (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                                + tipTemplateConsumableType.GroupName
-                                + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                                + (tipTemplateIndex + 1)));
-                            return false;
-                        }
+                        //if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
+                        //{
+                        //    Dispatcher.Invoke(() => MessageBox.Show(
+                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                        //        + srcConsumableType.GroupName
+                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                        //        + (sourceTemplateIndex + 1)));
+                        //    return false;
+                        //}
+                        //if (!dstConsumableType.TemplateAvailableList[targetTemplateIndex])
+                        //{
+                        //    Dispatcher.Invoke(() => MessageBox.Show(
+                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                        //        + dstConsumableType.GroupName
+                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                        //        + (targetTemplateIndex + 1)));
+                        //    return false;
+                        //}
+                        //if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
+                        //{
+                        //    Dispatcher.Invoke(() => MessageBox.Show(
+                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+                        //        + tipTemplateConsumableType.GroupName
+                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+                        //        + (tipTemplateIndex + 1)));
+                        //    return false;
+                        //}
 
                         var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType,
                             ConsumableHelper.GetHolePosStr(row.srcPos - 1,
