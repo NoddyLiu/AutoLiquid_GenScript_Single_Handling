@@ -1676,7 +1676,7 @@ namespace AutoLiquid_GenScript_Single_Handling
 
                 // ── 第一遍：收集所有有效数据行 ──
                 var dataRows = new List<(int row, string primerLabel, string srcLabel, string srcType,
-                    int srcPos, string dstLabel, string dstType, int dstPos, decimal volume)>();
+                    string srcPos, string dstLabel, string dstType, string dstPos, decimal volume)>();
                 for (int r = 2; ; r++)
                 {
                     var srcLabel = ws.Range[r, srcLabelCol].Text?.Trim() ?? "";
@@ -1693,8 +1693,9 @@ namespace AutoLiquid_GenScript_Single_Handling
                     var primerLabel = ws.Range[r, primerLabelCol].Text?.Trim() ?? "";  // A列，允许为空
                     var srcType = ws.Range[r, srcTypeCol].Text?.Trim() ?? "";
                     var dstType = ws.Range[r, dstTypeCol].Text?.Trim() ?? "";
-                    dataRows.Add((r, primerLabel, srcLabel, srcType,
-                        int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
+                    //dataRows.Add((r, primerLabel, srcLabel, srcType,
+                    //    int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
+                    dataRows.Add((r, primerLabel, srcLabel, srcType, srcPosStr, dstLabel, dstType, dstPosStr, decimal.Parse(volStr)));
                 }
 
                 if (dataRows.Count == 0)
@@ -1872,12 +1873,8 @@ namespace AutoLiquid_GenScript_Single_Handling
                         //    return false;
                         //}
 
-                        var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType,
-                            ConsumableHelper.GetHolePosStr(row.srcPos - 1,
-                                srcConsumableType.RowCount, srcConsumableType.ColCount, a1Pos, true));
-                        var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType,
-                            ConsumableHelper.GetHolePosStr(row.dstPos - 1,
-                                dstConsumableType.RowCount, dstConsumableType.ColCount, a1Pos, true));
+                        var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType, row.srcPos);
+                        var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType, row.dstPos);
 
                         seqList.Add(new Seq
                         {
