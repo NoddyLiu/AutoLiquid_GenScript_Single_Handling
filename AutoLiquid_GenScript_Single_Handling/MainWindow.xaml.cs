@@ -815,11 +815,11 @@ namespace AutoLiquid_GenScript_Single_Handling
                         var thisRoundSeqList = seqList.Where(s => s.Round == 1).ToList();
                         TipHelper.CalculateTipNeedCountByHead(thisRoundSeqList, headIndex, null, ref tipTotalCountNeed, replaceTipOverRange);
                         // 是否中途需要置满枪头盒
-                        if (tipTotalCountNeed > tipTotalCountRemain)
-                        {
-                            MessageBox.Show((string)this.FindResource("Prompt_Tip_Not_Enough_Pls_Fill_And_Start"));
-                            return;
-                        }
+                        //if (tipTotalCountNeed > tipTotalCountRemain)
+                        //{
+                        //    MessageBox.Show((string)this.FindResource("Prompt_Tip_Not_Enough_Pls_Fill_And_Start"));
+                        //    return;
+                        //}
                     }
 
                     // 运行
