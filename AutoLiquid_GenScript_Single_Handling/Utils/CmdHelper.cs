@@ -162,6 +162,44 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
         }
 
         /// <summary>
+        /// 标记源盘孔位完成（用于更新UI）
+        /// </summary>
+        /// <param name="templateIndex"></param>
+        /// <param name="headUsedIndex"></param>
+        /// <param name="holeIndex"></param>
+        /// <param name="tipChannel2DArray"></param>
+        private static void MarkSourceHoleCompleted(int templateIndex, int headUsedIndex, HoleIndex holeIndex, int[,] tipChannel2DArray)
+        {
+            if (MainWindow.mMainWindow == null)
+                return;
+
+            MainWindow.mMainWindow.Dispatcher.Invoke(() =>
+            {
+                if (MainWindow.sourceTemplateDict.TryGetValue(templateIndex, out var controlTemplate))
+                    controlTemplate.MarkTemplateHolesCompleted(headUsedIndex, holeIndex, tipChannel2DArray);
+            });
+        }
+
+        /// <summary>
+        /// 标记靶盘孔位完成（用于更新UI）
+        /// </summary>
+        /// <param name="templateIndex"></param>
+        /// <param name="headUsedIndex"></param>
+        /// <param name="holeIndex"></param>
+        /// <param name="tipChannel2DArray"></param>
+        private static void MarkTargetHoleCompleted(int templateIndex, int headUsedIndex, HoleIndex holeIndex, int[,] tipChannel2DArray)
+        {
+            if (MainWindow.mMainWindow == null)
+                return;
+
+            MainWindow.mMainWindow.Dispatcher.Invoke(() =>
+            {
+                if (MainWindow.targetTemplateDict.TryGetValue(templateIndex, out var controlTemplate))
+                    controlTemplate.MarkTemplateHolesCompleted(headUsedIndex, holeIndex, tipChannel2DArray);
+            });
+        }
+
+        /// <summary>
         /// 取枪头
         /// </summary>
         /// <param name="headUsedIndex">移液头Index</param>
@@ -549,6 +587,9 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
             // 吸液后特殊指令
             if (!seq.CmdAbsorbAfter.Equals(""))
                 MainWindow.mMainWindow.ParseCmdLine(seq.CmdAbsorbAfter, false);
+
+            // 标记源盘孔位完成
+            MarkSourceHoleCompleted(templateIndex, headUsedIndex, holeIndex, seq.TipChannel);
         }
 
         /// <summary>
@@ -771,6 +812,9 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
             // 喷液后特殊指令
             if (!seq.CmdJetAfter.Equals(""))
                 MainWindow.mMainWindow.ParseCmdLine(seq.CmdJetAfter, false);
+
+            // 标记靶盘孔位完成
+            MarkTargetHoleCompleted(templateIndex, headUsedIndex, holeIndex, seq.TipChannel);
 
             // 是否有残余液体，有的话判断是否打回到源孔
             if (headStatusList[headUsedIndex].VolumeAbsorbMoreLeft > 0 && reJet2Source)
@@ -1082,7 +1126,11 @@ namespace AutoLiquid_GenScript_Single_Handling.Utils
                 // 喷液后特殊指令
                 if (!seq.CmdJetAfter.Equals(""))
                     MainWindow.mMainWindow.ParseCmdLine(seq.CmdJetAfter, false);
+
+                // 标记靶盘孔位完成
+                MarkTargetHoleCompleted(templateIndex, headUsedIndex, holeIndex, seq.TipChannel);
             }
+
 
             // 是否有残余液体，有的话判断是否打回到源孔
             if (headStatusList[headUsedIndex].VolumeAbsorbMoreLeft > 0 && reJet2Source)

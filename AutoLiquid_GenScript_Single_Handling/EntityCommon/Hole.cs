@@ -24,5 +24,8 @@ namespace AutoLiquid_GenScript_Single_Handling.EntityCommon
 
         // 容量
         public decimal Capacity;
+
+        // 是否已执行完成
+        public bool IsCompleted;
     }
 }

@@ -1705,6 +1705,45 @@ namespace AutoLiquid_GenScript_Single_Handling
                     return false;
                 }
 
+                /**
+                 * 校验
+                 */
+                // 校验：相同源盘名必须对应相同源盘类型；相同靶盘名必须对应相同靶盘类型
+                var sourceLabelTypeMap = new Dictionary<string, (string type, int row)>();
+                var targetLabelTypeMap = new Dictionary<string, (string type, int row)>();
+                foreach (var row in dataRows)
+                {
+                    // 源盘校验
+                    if (sourceLabelTypeMap.TryGetValue(row.srcLabel, out var srcExist))
+                    {
+                        if (!string.Equals(srcExist.type, row.srcType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                $"Excel数据错误：源盘名“{row.srcLabel}”在第{srcExist.row}行和第{row.row}行对应了不同的源盘类型（“{srcExist.type}” / “{row.srcType}”），请检查C列。"));
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        sourceLabelTypeMap[row.srcLabel] = (row.srcType, row.row);
+                    }
+
+                    // 靶盘校验
+                    if (targetLabelTypeMap.TryGetValue(row.dstLabel, out var dstExist))
+                    {
+                        if (!string.Equals(dstExist.type, row.dstType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show(
+                                $"Excel数据错误：靶盘名“{row.dstLabel}”在第{dstExist.row}行和第{row.row}行对应了不同的靶盘类型（“{dstExist.type}” / “{row.dstType}”），请检查F列。"));
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        targetLabelTypeMap[row.dstLabel] = (row.dstType, row.row);
+                    }
+                }
+
                 // ══════════════════════════════════════════════════════════════
                 // ── 动态分配轮次与盘位 ──
                 //
