@@ -1623,6 +1623,367 @@ namespace AutoLiquid_GenScript_Single_Handling
         /// 解析Excel数据（新模板：A~H列，第2行起数据）
         /// A=引物名称, B=源盘名, C=源盘耗材类型, D=源位置序号, E=靶盘名, F=靶盘耗材类型, G=靶位置序号, H=体积
         /// </summary>
+        //private bool ParseDataFromExcel(string filePath)
+        //{
+        //    using (Workbook workbook = new Workbook())
+        //    {
+        //        try { workbook.LoadFromFile(filePath); }
+        //        catch (Exception e)
+        //        {
+        //            MessageBox.Show((string)this.FindResource("Prompt_Pls_Close_Excel_File_First"));
+        //            LogHelper.Error(e.StackTrace);
+        //            return false;
+        //        }
+
+        //        Worksheet ws;
+        //        try { ws = workbook.Worksheets[0]; }
+        //        catch (Exception ex)
+        //        {
+        //            MessageBox.Show((string)this.FindResource("Prompt_Excel_Must_Be_Xlsx_File_Or_File_Destroy"));
+        //            LogHelper.Error(ex.StackTrace);
+        //            return false;
+        //        }
+
+        //        seqList.Clear();
+
+        //        // ── Excel列常量（1-based）──
+        //        const int primerLabelCol = 1;  // A: primerlabel（引物名称，EP管架时逐管扫码用）
+        //        const int srcLabelCol = 2;  // B: Source Labware Label（源盘耗材名）
+        //        const int srcTypeCol = 3;  // C: Source Labware Type（源盘耗材类型）
+        //        const int srcPosCol = 4;  // D: Source Position（源位置序号，1-based）
+        //        const int dstLabelCol = 5;  // E: Destination Labware Label（靶盘耗材名）
+        //        const int dstTypeCol = 6;  // F: Destination Labware Type（靶盘耗材类型）
+        //        const int dstPosCol = 7;  // G: Destination Position（靶位置序号）
+        //        const int volumeCol = 8;  // H: Volume（体积）
+
+        //        // ── 盘面布局常量 ──
+        //        // 枪头盒候选盘位（固定占用最左列，按顺序分配）
+        //        var tipTemplateIndexCandidates = new List<int> { 0, 4, 8, 12 };
+        //        int totalTemplateCount = ParamsHelper.Layout.ColCount * ParamsHelper.Layout.RowCount;
+        //        const int headUsedIndex = 0;
+        //        var a1Pos = ParamsHelper.CommonSettingList[headUsedIndex].A1Pos;
+
+        //        // 枪头盒耗材类型（取第一个 IsTipBox=true）
+        //        var tipTemplateConsumableType = ParamsHelper.CommonSettingList[headUsedIndex]
+        //            .Consumables.FirstOrDefault(c => c.IsTipBox);
+        //        if (tipTemplateConsumableType == null)
+        //        {
+        //            Dispatcher.Invoke(() => MessageBox.Show(
+        //                (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+        //            return false;
+        //        }
+        //        int tipBoxCapacity = tipTemplateConsumableType.RowCount * tipTemplateConsumableType.ColCount;
+
+        //        // ── 第一遍：收集所有有效数据行 ──
+        //        var dataRows = new List<(int row, string primerLabel, string srcLabel, string srcType,
+        //            string srcPos, string dstLabel, string dstType, string dstPos, decimal volume)>();
+        //        for (int r = 2; ; r++)
+        //        {
+        //            var srcLabel = ws.Range[r, srcLabelCol].Text?.Trim() ?? "";
+        //            var dstLabel = ws.Range[r, dstLabelCol].Text?.Trim() ?? "";
+        //            if (string.IsNullOrEmpty(srcLabel) && string.IsNullOrEmpty(dstLabel)) break;
+        //            if (string.IsNullOrEmpty(srcLabel) || string.IsNullOrEmpty(dstLabel)) continue;
+
+        //            var srcPosStr = ws.Range[r, srcPosCol].Value?.Trim() ?? "";
+        //            var dstPosStr = ws.Range[r, dstPosCol].Value?.Trim() ?? "";
+        //            var volStr = ws.Range[r, volumeCol].Value?.Trim() ?? "";
+        //            if (string.IsNullOrEmpty(srcPosStr) || string.IsNullOrEmpty(dstPosStr) || string.IsNullOrEmpty(volStr))
+        //                continue;
+
+        //            var primerLabel = ws.Range[r, primerLabelCol].Text?.Trim() ?? "";  // A列，允许为空
+        //            var srcType = ws.Range[r, srcTypeCol].Text?.Trim() ?? "";
+        //            var dstType = ws.Range[r, dstTypeCol].Text?.Trim() ?? "";
+        //            //dataRows.Add((r, primerLabel, srcLabel, srcType,
+        //            //    int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
+        //            dataRows.Add((r, primerLabel, srcLabel, srcType, srcPosStr, dstLabel, dstType, dstPosStr, decimal.Parse(volStr)));
+        //        }
+
+        //        if (dataRows.Count == 0)
+        //        {
+        //            Dispatcher.Invoke(() => MessageBox.Show(
+        //                (string)this.FindResource("Prompt_Import_Excel_Must_Not_Be_Empty")));
+        //            return false;
+        //        }
+
+        //        /**
+        //         * 校验
+        //         */
+        //        // 校验：相同源盘名必须对应相同源盘类型；相同靶盘名必须对应相同靶盘类型
+        //        var sourceLabelTypeMap = new Dictionary<string, (string type, int row)>();
+        //        var targetLabelTypeMap = new Dictionary<string, (string type, int row)>();
+        //        foreach (var row in dataRows)
+        //        {
+        //            // 源盘校验
+        //            if (sourceLabelTypeMap.TryGetValue(row.srcLabel, out var srcExist))
+        //            {
+        //                if (!string.Equals(srcExist.type, row.srcType, StringComparison.OrdinalIgnoreCase))
+        //                {
+        //                    Dispatcher.Invoke(() => MessageBox.Show(
+        //                        $"Excel数据错误：源盘名“{row.srcLabel}”在第{srcExist.row}行和第{row.row}行对应了不同的源盘类型（“{srcExist.type}” / “{row.srcType}”），请检查C列。"));
+        //                    return false;
+        //                }
+        //            }
+        //            else
+        //            {
+        //                sourceLabelTypeMap[row.srcLabel] = (row.srcType, row.row);
+        //            }
+
+        //            // 靶盘校验
+        //            if (targetLabelTypeMap.TryGetValue(row.dstLabel, out var dstExist))
+        //            {
+        //                if (!string.Equals(dstExist.type, row.dstType, StringComparison.OrdinalIgnoreCase))
+        //                {
+        //                    Dispatcher.Invoke(() => MessageBox.Show(
+        //                        $"Excel数据错误：靶盘名“{row.dstLabel}”在第{dstExist.row}行和第{row.row}行对应了不同的靶盘类型（“{dstExist.type}” / “{row.dstType}”），请检查F列。"));
+        //                    return false;
+        //                }
+        //            }
+        //            else
+        //            {
+        //                targetLabelTypeMap[row.dstLabel] = (row.dstType, row.row);
+        //            }
+        //        }
+
+        //        // ══════════════════════════════════════════════════════════════
+        //        // ── 动态分配轮次与盘位 ──
+        //        //
+        //        // 核心思路：
+        //        //   1. 按总行数一次性确定枪头盒数量（所有轮次共用固定候选盘位的前N个）
+        //        //   2. 未被枪头盒占用的候选盘位，归还给源/靶盘可用盘位池
+        //        //   3. 剩余盘位不够放所有唯一盘名时，按 maxPlatesPerRound 分轮
+        //        //   4. 同一行的 srcLabel 和 dstLabel 必须属于同一轮；
+        //        //      分轮时以"行"为粒度整体分配，避免源盘/靶盘跨轮
+        //        //   5. 枪头盒游标跨轮连续推进
+        //        // ══════════════════════════════════════════════════════════════
+
+        //        // 步骤1：按总行数一次性确定枪头盒盘位（全程固定，所有轮次共用）
+        //        int totalTipBoxCount = Math.Min(
+        //            tipTemplateIndexCandidates.Count,
+        //            (dataRows.Count + tipBoxCapacity - 1) / tipBoxCapacity);
+        //        var tipIndexSet = new HashSet<int>(tipTemplateIndexCandidates.Take(totalTipBoxCount));
+
+        //        // 步骤2：剩余可分配给源/靶盘的盘位
+        //        //   = 全部盘位  −  已用枪头盒盘位
+        //        //   未用的候选盘位（如候选有4个但只用2个）自动归还给此池
+        //        var availablePlateSlots = Enumerable.Range(0, totalTemplateCount)
+        //            .Where(idx => !tipIndexSet.Contains(idx))
+        //            .ToList();
+        //        int maxPlatesPerRound = availablePlateSlots.Count;
+
+        //        if (maxPlatesPerRound == 0)
+        //        {
+        //            Dispatcher.Invoke(() => MessageBox.Show(
+        //                (string)this.FindResource("Prompt_Pls_Check_Excel_And_Consumable_Info")));
+        //            return false;
+        //        }
+
+        //        // 步骤3：收集全部唯一盘名对（srcLabel, dstLabel），按首次出现顺序，以行为单位
+        //        //   确保同一行的两个盘名始终在同一轮（作为整体分配）
+        //        var allUniquePlatePairs = new List<(string src, string dst)>();
+        //        var seenPlates = new HashSet<string>();
+        //        foreach (var row in dataRows)
+        //        {
+        //            // 记录首次出现的盘名，以行为粒度确保 src+dst 同轮
+        //            if (!seenPlates.Contains(row.srcLabel) || !seenPlates.Contains(row.dstLabel))
+        //            {
+        //                allUniquePlatePairs.Add((row.srcLabel, row.dstLabel));
+        //                seenPlates.Add(row.srcLabel);
+        //                seenPlates.Add(row.dstLabel);
+        //            }
+        //        }
+
+        //        // 步骤4：贪心分组——每组最多占用 maxPlatesPerRound 个盘位槽，生成盘名→盘位映射
+        //        //   同一行的 src/dst 若已有任意一个被分进某轮，另一个也必须进同一轮
+        //        var roundPlateTemplateIndexMap = new List<Dictionary<string, int>>();
+        //        var plateRoundMap = new Dictionary<string, int>();
+
+        //        {
+        //            var currentPlateMap = new Dictionary<string, int>();
+        //            var currentSlotIndex = 0;
+        //            int currentRound = 1;
+
+        //            foreach (var pair in allUniquePlatePairs)
+        //            {
+        //                // 计算本对需要占用的新盘位数（已在本轮分配过的不重复计）
+        //                int slotsNeeded = 0;
+        //                if (!currentPlateMap.ContainsKey(pair.src)) slotsNeeded++;
+        //                if (!currentPlateMap.ContainsKey(pair.dst) && pair.dst != pair.src) slotsNeeded++;
+
+        //                // 本轮盘位不足，开启新一轮
+        //                if (currentSlotIndex + slotsNeeded > maxPlatesPerRound)
+        //                {
+        //                    roundPlateTemplateIndexMap.Add(currentPlateMap);
+        //                    currentPlateMap = new Dictionary<string, int>();
+        //                    currentSlotIndex = 0;
+        //                    currentRound++;
+        //                }
+
+        //                if (!currentPlateMap.ContainsKey(pair.src))
+        //                {
+        //                    currentPlateMap[pair.src] = availablePlateSlots[currentSlotIndex++];
+        //                    plateRoundMap[pair.src] = currentRound;
+        //                }
+        //                if (!currentPlateMap.ContainsKey(pair.dst))
+        //                {
+        //                    currentPlateMap[pair.dst] = availablePlateSlots[currentSlotIndex++];
+        //                    plateRoundMap[pair.dst] = currentRound;
+        //                }
+        //            }
+
+        //            if (currentPlateMap.Count > 0)
+        //                roundPlateTemplateIndexMap.Add(currentPlateMap);
+        //        }
+
+        //        int maxRound = roundPlateTemplateIndexMap.Count;
+
+        //        // 步骤5：给每行分配轮次和枪头盒盘位（游标跨轮连续）
+        //        var rowRound = new int[dataRows.Count];
+        //        var rowTipTemplateIndex = new int[dataRows.Count];
+        //        int globalTipConsumed = 0;
+
+        //        for (int i = 0; i < dataRows.Count; i++)
+        //        {
+        //            // 轮次由源盘名决定（步骤4已保证 src 和 dst 同轮）
+        //            rowRound[i] = plateRoundMap[dataRows[i].srcLabel];
+
+        //            // 枪头盒盘位：全局游标连续推进，超出候选数时循环取模
+        //            int slot = globalTipConsumed / tipBoxCapacity;
+        //            int candidateIdx = slot % tipTemplateIndexCandidates.Count;
+        //            rowTipTemplateIndex[i] = tipTemplateIndexCandidates[candidateIdx];
+        //            globalTipConsumed++;
+        //        }
+
+        //        // ── 第二遍：逐行生成 Seq ──
+        //        for (int dataRowIndex = 0; dataRowIndex < dataRows.Count; dataRowIndex++)
+        //        {
+        //            var row = dataRows[dataRowIndex];
+        //            try
+        //            {
+        //                int round = rowRound[dataRowIndex];
+        //                var plateMap = roundPlateTemplateIndexMap[round - 1];
+        //                int tipTemplateIndex = rowTipTemplateIndex[dataRowIndex];
+
+        //                // 解析源盘耗材类型
+        //                var srcConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.srcType, false);
+        //                if (srcConsumableType == null)
+        //                {
+        //                    Dispatcher.Invoke(() => MessageBox.Show(
+        //                        (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+        //                    return false;
+        //                }
+        //                // 解析靶盘耗材类型
+        //                var dstConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.dstType, false);
+        //                if (dstConsumableType == null)
+        //                {
+        //                    Dispatcher.Invoke(() => MessageBox.Show(
+        //                        (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
+        //                    return false;
+        //                }
+
+        //                // 打印信息
+        //                System.Diagnostics.Debug.WriteLine($"ParseDataFromExcel - dataRowIndex={dataRowIndex}, round={round}");
+        //                System.Diagnostics.Debug.WriteLine("ParseDataFromExcel - plateRoundMap: " + string.Join(", ", plateRoundMap.Select(kv => kv.Key + "=" + kv.Value)));
+        //                System.Diagnostics.Debug.WriteLine("ParseDataFromExcel - plateMap: " + string.Join(", ", plateMap.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+        //                System.Diagnostics.Debug.WriteLine("ParseDataFromExcel - row: src=" + row.srcLabel + ", dst=" + row.dstLabel);
+        //                if (!plateMap.ContainsKey(row.srcLabel) || !plateMap.ContainsKey(row.dstLabel))
+        //                {
+        //                    System.Diagnostics.Debug.WriteLine($"ParseDataFromExcel - Missing key(s): srcPresent={plateMap.ContainsKey(row.srcLabel)}, dstPresent={plateMap.ContainsKey(row.dstLabel)}");
+
+        //                    Dispatcher.Invoke(() => MessageBox.Show($"导入错误：第{row.row}行的盘位分配不完整（src={row.srcLabel}, dst={row.dstLabel}），请检查Excel或重新分配轮次。" ));
+        //                    return false;
+        //                }
+
+        //                int sourceTemplateIndex = plateMap[row.srcLabel];
+        //                int targetTemplateIndex = plateMap[row.dstLabel];
+
+        //                // 校验盘位是否启用
+        //                //if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
+        //                //{
+        //                //    Dispatcher.Invoke(() => MessageBox.Show(
+        //                //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+        //                //        + srcConsumableType.GroupName
+        //                //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+        //                //        + (sourceTemplateIndex + 1)));
+        //                //    return false;
+        //                //}
+        //                //if (!dstConsumableType.TemplateAvailableList[targetTemplateIndex])
+        //                //{
+        //                //    Dispatcher.Invoke(() => MessageBox.Show(
+        //                //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+        //                //        + dstConsumableType.GroupName
+        //                //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+        //                //        + (targetTemplateIndex + 1)));
+        //                //    return false;
+        //                //}
+        //                //if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
+        //                //{
+        //                //    Dispatcher.Invoke(() => MessageBox.Show(
+        //                //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
+        //                //        + tipTemplateConsumableType.GroupName
+        //                //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
+        //                //        + (tipTemplateIndex + 1)));
+        //                //    return false;
+        //                //}
+
+        //                var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType, row.srcPos);
+        //                var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType, row.dstPos);
+
+        //                seqList.Add(new Seq
+        //                {
+        //                    TipTemplateIndex = tipTemplateIndex,
+        //                    TipTemplateAssign = false,
+        //                    TipTemplateConsumableType = tipTemplateConsumableType,
+        //                    TipChannel = new int[ParamsHelper.HeadList[headUsedIndex].ChannelRow,
+        //                                          ParamsHelper.HeadList[headUsedIndex].ChannelCol],
+        //                    IsTakeTip = true,
+
+        //                    SourceTemplateName = row.srcLabel,
+        //                    SourceTemplateIndex = sourceTemplateIndex,
+        //                    SourceTemplateConsumableType = srcConsumableType,
+        //                    SourceHoleIndexList = new List<HoleIndex> { sourceHoleIndex },
+
+        //                    TargetTemplateName = row.dstLabel,
+        //                    TargetTemplateIndexList = new List<int> { targetTemplateIndex },
+        //                    TargetTemplateConsumableType = dstConsumableType,
+        //                    TargetHoleIndexList = new List<HoleIndex> { targetHoleIndex },
+
+        //                    VolumeEachList = new List<Volume> { new Volume { Original = row.volume } },
+
+        //                    Round = round,
+        //                    HeadUsedIndex = headUsedIndex,
+
+        //                    EpTubePrimerLabel = row.primerLabel,   // ← 新增
+        //                });
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                MessageBox.Show((string)this.FindResource("Prompt_Excel_Error_1") + row.row
+        //                              + (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
+        //                LogHelper.Error(ex.StackTrace);
+        //                LogHelper.Error(ex.Message);
+        //                return false;
+        //            }
+        //        }
+
+        //        try
+        //        {
+        //            Dispatcher.Invoke(() =>
+        //            {
+        //                // 新任务导入时清空跨轮持久状态
+        //                tipTemplatePersistDict.Clear();
+        //                InitTemplates(1);
+        //            });
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            MessageBox.Show((string)this.FindResource("Prompt_Pls_Check_Excel_And_Consumable_Info"));
+        //            LogHelper.Error(ex.StackTrace);
+        //            return false;
+        //        }
+
+        //        return true;
+        //    }
+        //}
         private bool ParseDataFromExcel(string filePath)
         {
             using (Workbook workbook = new Workbook())
@@ -1657,13 +2018,11 @@ namespace AutoLiquid_GenScript_Single_Handling
                 const int volumeCol = 8;  // H: Volume（体积）
 
                 // ── 盘面布局常量 ──
-                // 枪头盒候选盘位（固定占用最左列，按顺序分配）
                 var tipTemplateIndexCandidates = new List<int> { 0, 4, 8, 12 };
                 int totalTemplateCount = ParamsHelper.Layout.ColCount * ParamsHelper.Layout.RowCount;
                 const int headUsedIndex = 0;
                 var a1Pos = ParamsHelper.CommonSettingList[headUsedIndex].A1Pos;
 
-                // 枪头盒耗材类型（取第一个 IsTipBox=true）
                 var tipTemplateConsumableType = ParamsHelper.CommonSettingList[headUsedIndex]
                     .Consumables.FirstOrDefault(c => c.IsTipBox);
                 if (tipTemplateConsumableType == null)
@@ -1693,8 +2052,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                     var primerLabel = ws.Range[r, primerLabelCol].Text?.Trim() ?? "";  // A列，允许为空
                     var srcType = ws.Range[r, srcTypeCol].Text?.Trim() ?? "";
                     var dstType = ws.Range[r, dstTypeCol].Text?.Trim() ?? "";
-                    //dataRows.Add((r, primerLabel, srcLabel, srcType,
-                    //    int.Parse(srcPosStr), dstLabel, dstType, int.Parse(dstPosStr), decimal.Parse(volStr)));
                     dataRows.Add((r, primerLabel, srcLabel, srcType, srcPosStr, dstLabel, dstType, dstPosStr, decimal.Parse(volStr)));
                 }
 
@@ -1708,12 +2065,10 @@ namespace AutoLiquid_GenScript_Single_Handling
                 /**
                  * 校验
                  */
-                // 校验：相同源盘名必须对应相同源盘类型；相同靶盘名必须对应相同靶盘类型
                 var sourceLabelTypeMap = new Dictionary<string, (string type, int row)>();
                 var targetLabelTypeMap = new Dictionary<string, (string type, int row)>();
                 foreach (var row in dataRows)
                 {
-                    // 源盘校验
                     if (sourceLabelTypeMap.TryGetValue(row.srcLabel, out var srcExist))
                     {
                         if (!string.Equals(srcExist.type, row.srcType, StringComparison.OrdinalIgnoreCase))
@@ -1728,7 +2083,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                         sourceLabelTypeMap[row.srcLabel] = (row.srcType, row.row);
                     }
 
-                    // 靶盘校验
                     if (targetLabelTypeMap.TryGetValue(row.dstLabel, out var dstExist))
                     {
                         if (!string.Equals(dstExist.type, row.dstType, StringComparison.OrdinalIgnoreCase))
@@ -1745,26 +2099,15 @@ namespace AutoLiquid_GenScript_Single_Handling
                 }
 
                 // ══════════════════════════════════════════════════════════════
-                // ── 动态分配轮次与盘位 ──
-                //
-                // 核心思路：
-                //   1. 按总行数一次性确定枪头盒数量（所有轮次共用固定候选盘位的前N个）
-                //   2. 未被枪头盒占用的候选盘位，归还给源/靶盘可用盘位池
-                //   3. 剩余盘位不够放所有唯一盘名时，按 maxPlatesPerRound 分轮
-                //   4. 同一行的 srcLabel 和 dstLabel 必须属于同一轮；
-                //      分轮时以"行"为粒度整体分配，避免源盘/靶盘跨轮
-                //   5. 枪头盒游标跨轮连续推进
+                // ── 动态分配轮次与盘位（按输入行顺序逐行贪心分配） ──
+                //    保证同一行的 srcLabel 和 dstLabel 必须属于同一轮
                 // ══════════════════════════════════════════════════════════════
 
-                // 步骤1：按总行数一次性确定枪头盒盘位（全程固定，所有轮次共用）
                 int totalTipBoxCount = Math.Min(
                     tipTemplateIndexCandidates.Count,
                     (dataRows.Count + tipBoxCapacity - 1) / tipBoxCapacity);
                 var tipIndexSet = new HashSet<int>(tipTemplateIndexCandidates.Take(totalTipBoxCount));
 
-                // 步骤2：剩余可分配给源/靶盘的盘位
-                //   = 全部盘位  −  已用枪头盒盘位
-                //   未用的候选盘位（如候选有4个但只用2个）自动归还给此池
                 var availablePlateSlots = Enumerable.Range(0, totalTemplateCount)
                     .Where(idx => !tipIndexSet.Contains(idx))
                     .ToList();
@@ -1777,39 +2120,24 @@ namespace AutoLiquid_GenScript_Single_Handling
                     return false;
                 }
 
-                // 步骤3：收集全部唯一盘名对（srcLabel, dstLabel），按首次出现顺序，以行为单位
-                //   确保同一行的两个盘名始终在同一轮（作为整体分配）
-                var allUniquePlatePairs = new List<(string src, string dst)>();
-                var seenPlates = new HashSet<string>();
-                foreach (var row in dataRows)
-                {
-                    // 记录首次出现的盘名，以行为粒度确保 src+dst 同轮
-                    if (!seenPlates.Contains(row.srcLabel) || !seenPlates.Contains(row.dstLabel))
-                    {
-                        allUniquePlatePairs.Add((row.srcLabel, row.dstLabel));
-                        seenPlates.Add(row.srcLabel);
-                        seenPlates.Add(row.dstLabel);
-                    }
-                }
-
-                // 步骤4：贪心分组——每组最多占用 maxPlatesPerRound 个盘位槽，生成盘名→盘位映射
-                //   同一行的 src/dst 若已有任意一个被分进某轮，另一个也必须进同一轮
+                // 按行贪心分配：生成 roundPlateTemplateIndexMap 和 rowRound
                 var roundPlateTemplateIndexMap = new List<Dictionary<string, int>>();
-                var plateRoundMap = new Dictionary<string, int>();
+                var rowRound = new int[dataRows.Count];
 
                 {
                     var currentPlateMap = new Dictionary<string, int>();
-                    var currentSlotIndex = 0;
+                    int currentSlotIndex = 0;
                     int currentRound = 1;
 
-                    foreach (var pair in allUniquePlatePairs)
+                    for (int i = 0; i < dataRows.Count; i++)
                     {
-                        // 计算本对需要占用的新盘位数（已在本轮分配过的不重复计）
-                        int slotsNeeded = 0;
-                        if (!currentPlateMap.ContainsKey(pair.src)) slotsNeeded++;
-                        if (!currentPlateMap.ContainsKey(pair.dst) && pair.dst != pair.src) slotsNeeded++;
+                        var src = dataRows[i].srcLabel;
+                        var dst = dataRows[i].dstLabel;
 
-                        // 本轮盘位不足，开启新一轮
+                        int slotsNeeded = 0;
+                        if (!currentPlateMap.ContainsKey(src)) slotsNeeded++;
+                        if (!currentPlateMap.ContainsKey(dst) && dst != src) slotsNeeded++;
+
                         if (currentSlotIndex + slotsNeeded > maxPlatesPerRound)
                         {
                             roundPlateTemplateIndexMap.Add(currentPlateMap);
@@ -1818,16 +2146,32 @@ namespace AutoLiquid_GenScript_Single_Handling
                             currentRound++;
                         }
 
-                        if (!currentPlateMap.ContainsKey(pair.src))
+                        if (!currentPlateMap.ContainsKey(src))
                         {
-                            currentPlateMap[pair.src] = availablePlateSlots[currentSlotIndex++];
-                            plateRoundMap[pair.src] = currentRound;
+                            if (currentSlotIndex >= availablePlateSlots.Count)
+                            {
+                                // 再次开新轮（保险）
+                                roundPlateTemplateIndexMap.Add(currentPlateMap);
+                                currentPlateMap = new Dictionary<string, int>();
+                                currentSlotIndex = 0;
+                                currentRound++;
+                            }
+                            currentPlateMap[src] = availablePlateSlots[currentSlotIndex++];
                         }
-                        if (!currentPlateMap.ContainsKey(pair.dst))
+
+                        if (!currentPlateMap.ContainsKey(dst) && dst != src)
                         {
-                            currentPlateMap[pair.dst] = availablePlateSlots[currentSlotIndex++];
-                            plateRoundMap[pair.dst] = currentRound;
+                            if (currentSlotIndex >= availablePlateSlots.Count)
+                            {
+                                roundPlateTemplateIndexMap.Add(currentPlateMap);
+                                currentPlateMap = new Dictionary<string, int>();
+                                currentSlotIndex = 0;
+                                currentRound++;
+                            }
+                            currentPlateMap[dst] = availablePlateSlots[currentSlotIndex++];
                         }
+
+                        rowRound[i] = currentRound;
                     }
 
                     if (currentPlateMap.Count > 0)
@@ -1836,17 +2180,11 @@ namespace AutoLiquid_GenScript_Single_Handling
 
                 int maxRound = roundPlateTemplateIndexMap.Count;
 
-                // 步骤5：给每行分配轮次和枪头盒盘位（游标跨轮连续）
-                var rowRound = new int[dataRows.Count];
+                // 为每行生成枪头盒盘位（全局游标跨轮连续）
                 var rowTipTemplateIndex = new int[dataRows.Count];
                 int globalTipConsumed = 0;
-
                 for (int i = 0; i < dataRows.Count; i++)
                 {
-                    // 轮次由源盘名决定（步骤4已保证 src 和 dst 同轮）
-                    rowRound[i] = plateRoundMap[dataRows[i].srcLabel];
-
-                    // 枪头盒盘位：全局游标连续推进，超出候选数时循环取模
                     int slot = globalTipConsumed / tipBoxCapacity;
                     int candidateIdx = slot % tipTemplateIndexCandidates.Count;
                     rowTipTemplateIndex[i] = tipTemplateIndexCandidates[candidateIdx];
@@ -1860,10 +2198,15 @@ namespace AutoLiquid_GenScript_Single_Handling
                     try
                     {
                         int round = rowRound[dataRowIndex];
+                        if (round <= 0 || round > roundPlateTemplateIndexMap.Count)
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show($"导入错误：第{row.row}行的轮次分配异常（round={round}），请检查Excel。"));
+                            return false;
+                        }
+
                         var plateMap = roundPlateTemplateIndexMap[round - 1];
                         int tipTemplateIndex = rowTipTemplateIndex[dataRowIndex];
 
-                        // 解析源盘耗材类型
                         var srcConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.srcType, false);
                         if (srcConsumableType == null)
                         {
@@ -1871,7 +2214,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                                 (string)this.FindResource("Prompt_Import_Excel_Group_Name_Not_Exist")));
                             return false;
                         }
-                        // 解析靶盘耗材类型
                         var dstConsumableType = ConsumableHelper.GetConsumableType(headUsedIndex, row.dstType, false);
                         if (dstConsumableType == null)
                         {
@@ -1880,37 +2222,15 @@ namespace AutoLiquid_GenScript_Single_Handling
                             return false;
                         }
 
+                        // 防御性检查：确保本轮 plateMap 包含 src 与 dst
+                        if (!plateMap.ContainsKey(row.srcLabel) || !plateMap.ContainsKey(row.dstLabel))
+                        {
+                            Dispatcher.Invoke(() => MessageBox.Show($"导入错误：第{row.row}行的盘位分配不完整（src={row.srcLabel}, dst={row.dstLabel}），请检查Excel或重新分配轮次。"));
+                            return false;
+                        }
+
                         int sourceTemplateIndex = plateMap[row.srcLabel];
                         int targetTemplateIndex = plateMap[row.dstLabel];
-
-                        // 校验盘位是否启用
-                        //if (!srcConsumableType.TemplateAvailableList[sourceTemplateIndex])
-                        //{
-                        //    Dispatcher.Invoke(() => MessageBox.Show(
-                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                        //        + srcConsumableType.GroupName
-                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                        //        + (sourceTemplateIndex + 1)));
-                        //    return false;
-                        //}
-                        //if (!dstConsumableType.TemplateAvailableList[targetTemplateIndex])
-                        //{
-                        //    Dispatcher.Invoke(() => MessageBox.Show(
-                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                        //        + dstConsumableType.GroupName
-                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                        //        + (targetTemplateIndex + 1)));
-                        //    return false;
-                        //}
-                        //if (!tipTemplateConsumableType.TemplateAvailableList[tipTemplateIndex])
-                        //{
-                        //    Dispatcher.Invoke(() => MessageBox.Show(
-                        //        (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_1")
-                        //        + tipTemplateConsumableType.GroupName
-                        //        + (string)this.FindResource("Prompt_Pls_Enable_Template_In_User_Setting_2")
-                        //        + (tipTemplateIndex + 1)));
-                        //    return false;
-                        //}
 
                         var sourceHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, srcConsumableType, row.srcPos);
                         var targetHoleIndex = ConsumableHelper.GetHoleIndex(headUsedIndex, dstConsumableType, row.dstPos);
@@ -1939,7 +2259,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                             Round = round,
                             HeadUsedIndex = headUsedIndex,
 
-                            EpTubePrimerLabel = row.primerLabel,   // ← 新增
+                            EpTubePrimerLabel = row.primerLabel,
                         });
                     }
                     catch (Exception ex)
@@ -1947,6 +2267,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                         MessageBox.Show((string)this.FindResource("Prompt_Excel_Error_1") + row.row
                                       + (string)this.FindResource("Prompt_Excel_Error_2") + "：" + "");
                         LogHelper.Error(ex.StackTrace);
+                        LogHelper.Error(ex.Message);
                         return false;
                     }
                 }
@@ -1955,7 +2276,6 @@ namespace AutoLiquid_GenScript_Single_Handling
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        // 新任务导入时清空跨轮持久状态
                         tipTemplatePersistDict.Clear();
                         InitTemplates(1);
                     });
