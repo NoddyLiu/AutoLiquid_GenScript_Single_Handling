@@ -101,11 +101,17 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
 
         public bool IsConfirmed { get; private set; } = false;
 
-        // ── 构造 ──
+        // ── 自动扫码相关字段 ──
+        private bool _autoSimulateScan = false;  // 自动模拟扫码开关（调试用）
+        private System.Windows.Threading.DispatcherTimer _autoScanTimer;
 
-        public WindowBarcodeVerify(List<Seq> seqList, int round, int maxRound)
+
+        // ── 构造 ──
+        public WindowBarcodeVerify(List<Seq> seqList, int round, int maxRound, bool autoScan = false)
         {
             InitializeComponent();
+
+            _autoSimulateScan = autoScan;
 
             _rowCount = ParamsHelper.Layout.RowCount;
             _colCount = ParamsHelper.Layout.ColCount;
@@ -147,10 +153,26 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 ComponentDispatcher.ThreadPreprocessMessage += OnThreadPreprocessMessage;
                 _hookRegistered = true;
             }
+
+            // ── 自动扫码初始化 ──
+            if (_autoSimulateScan)
+            {
+                _autoScanTimer = new System.Windows.Threading.DispatcherTimer();
+                _autoScanTimer.Interval = TimeSpan.FromMilliseconds(2000);  // 每2000ms自动扫一个盘位
+                _autoScanTimer.Tick += (s, args) => AutoScanNextSlot();
+                _autoScanTimer.Start();
+            }
         }
 
         private void OnClosed(object sender, EventArgs e)
         {
+            // ── 停止自动扫码 ──
+            if (_autoScanTimer != null)
+            {
+                _autoScanTimer.Stop();
+                _autoScanTimer = null;
+            }
+
             if (_hookRegistered)
             {
                 ComponentDispatcher.ThreadPreprocessMessage -= OnThreadPreprocessMessage;
@@ -461,7 +483,8 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                     var epWnd = new WindowEpRackScan(
                         item.EpRackConsumable,
                         item.Title,
-                        item.EpTubePrimerLabels)
+                        item.EpTubePrimerLabels,
+                       autoScan:_autoSimulateScan)
                     {
                         Owner = this
                     };
@@ -595,6 +618,31 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                         item.Title, item.ExpectedBarcode);
                     this.TextBlockStatus.Foreground = Brushes.DimGray;
                 }
+            }
+
+
+        }
+
+        /// <summary>
+        /// 自动扫码当前盘位（用于测试扫码顺序）
+        /// </summary>
+        private void AutoScanNextSlot()
+        {
+            if (_currentScanIndex < 0 || _currentScanIndex >= _scanItems.Count)
+                return;
+
+            var item = _scanItems.Values.ElementAtOrDefault(_currentScanIndex);
+            if (item == null)
+                return;
+
+            // EP管架交给次级框处理（次级框会自动扫码）
+            if (item.IsEpRack)
+                return;  // EP窗口自己会自动处理
+
+            // 普通盘位：自动输入条码
+            if (!item.IsTipBox && !string.IsNullOrEmpty(item.ExpectedBarcode))
+            {
+                ProcessScan(item.ExpectedBarcode);
             }
         }
     }

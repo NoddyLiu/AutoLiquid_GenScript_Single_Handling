@@ -85,16 +85,47 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         /// <summary>是否全部确认（供主框判断）</summary>
         public bool IsConfirmed { get; private set; } = false;
 
+        // ── 自动扫码相关字段 ──
+        private bool _autoSimulateScan = false;  // 自动模拟扫码开关（调试用）
+        private System.Windows.Threading.DispatcherTimer _autoScanTimer;
+
+        private const int COL_FIRST = 0;  // 列优先模式（旧数据格式）
+        private const int ROW_FIRST = 1;  // 行优先模式（新扫码顺序）
+
+        /// <summary>
+        /// 将列优先索引转换为行优先索引
+        /// 列优先: holeIdx = col * rowCount + row
+        /// 行优先: newIdx = row * colCount + col
+        /// </summary>
+        private int ConvertColFirstToRowFirst(int colFirstIdx)
+        {
+            int row = colFirstIdx % _rowCount;
+            int col = colFirstIdx / _rowCount;
+            return row * _colCount + col;
+        }
+
+        /// <summary>
+        /// 反向转换：行优先 → 列优先
+        /// </summary>
+        private int ConvertRowFirstToColFirst(int rowFirstIdx)
+        {
+            int row = rowFirstIdx / _colCount;
+            int col = rowFirstIdx % _colCount;
+            return col * _rowCount + row;
+        }
+
         // ── 构造 ──
         /// <param name="consumable">EP管架耗材配置（提供 RowCount / ColCount）</param>
         /// <param name="slotTitle">盘位标题，如"源盘1"或"靶盘1"</param>
         /// <param name="primerLabels">
-        ///   按孔Index（0-based，列优先）顺序的引物名称列表。
+        ///   按孔Index（0-based，行优先）顺序的引物名称列表。
         ///   空字符串 = 该孔无对应Excel行，不扫码但仍绘制格子。
         /// </param>
-        public WindowEpRackScan(Consumable consumable, string slotTitle, List<string> primerLabels)
+        public WindowEpRackScan(Consumable consumable, string slotTitle, List<string> primerLabels, bool autoScan = false)
         {
             InitializeComponent();
+
+            _autoSimulateScan = autoScan; 
 
             _rowCount = consumable.RowCount;
             _colCount = consumable.ColCount;
@@ -148,6 +179,7 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         //}
         /// <summary>
         /// 根据 RowCount × ColCount 建立全量孔位列表（行优先：先从左往右，再从上到下）。
+        /// 输入 primerLabels 是列优先格式，需转换为行优先。
         /// </summary>
         private void BuildHoles(List<string> primerLabels)
         {
@@ -156,11 +188,13 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             for (int holeIdx = 0; holeIdx < total; holeIdx++)
             {
                 // 行优先：holeIdx = row * colCount + col
-                int rowIdx = holeIdx / _colCount;      // 行号
-                int colIdx = holeIdx % _colCount;      // 列号
+                int rowIdx = holeIdx / _colCount;
+                int colIdx = holeIdx % _colCount;
                 string holeName = (char)('A' + rowIdx) + (colIdx + 1).ToString();
 
-                string primer = (holeIdx < primerLabels.Count) ? primerLabels[holeIdx] : "";
+                // 重点：从列优先的 primerLabels 中读取数据
+                int colFirstIdx = ConvertRowFirstToColFirst(holeIdx);
+                string primer = (colFirstIdx < primerLabels.Count) ? primerLabels[colFirstIdx] : "";
 
                 _allHoles.Add(new HoleScanItem
                 {
@@ -548,10 +582,26 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 ComponentDispatcher.ThreadPreprocessMessage += OnThreadPreprocessMessage;
                 _hookRegistered = true;
             }
+
+            // ── 自动扫码初始化 ──
+            if (_autoSimulateScan)
+            {
+                _autoScanTimer = new System.Windows.Threading.DispatcherTimer();
+                _autoScanTimer.Interval = TimeSpan.FromMilliseconds(2000);  // 每2000ms自动扫一个孔
+                _autoScanTimer.Tick += (s, args) => AutoScanNext();
+                _autoScanTimer.Start();
+            }
         }
 
         private void OnClosed(object sender, EventArgs e)
         {
+            // ── 停止自动扫码 ──
+            if (_autoScanTimer != null)
+            {
+                _autoScanTimer.Stop();
+                _autoScanTimer = null;
+            }
+
             if (_hookRegistered)
             {
                 ComponentDispatcher.ThreadPreprocessMessage -= OnThreadPreprocessMessage;
@@ -602,6 +652,27 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             var sb = new StringBuilder(4);
             int count = ToUnicode(vk, scanCode, keyboardState, sb, sb.Capacity, 0);
             return count == 1 ? sb.ToString() : null;
+        }
+
+        /// <summary>
+        /// 自动扫码当前孔位（用于测试扫码顺序）
+        /// </summary>
+        private void AutoScanNext()
+        {
+            if (_currentListIndex < 0 || _currentListIndex >= _allHoles.Count)
+                return;
+
+            var hole = _allHoles[_currentListIndex];
+            string barcode = hole.ExpectedPrimerLabel;
+
+            if (string.IsNullOrEmpty(barcode))
+            {
+                AdvanceQueue();
+                return;
+            }
+
+            // 自动输入条码
+            ProcessScan(barcode);
         }
     }
 }

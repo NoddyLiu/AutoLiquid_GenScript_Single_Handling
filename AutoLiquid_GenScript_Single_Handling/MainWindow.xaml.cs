@@ -1015,7 +1015,7 @@ namespace AutoLiquid_GenScript_Single_Handling
                             InitTemplates(currentRound);
                             if (ParamsHelper.IO.ScanAvailable)
                             {
-                                var verifyWnd = new WindowBarcodeVerify(seqList, currentRound, maxRound)
+                                var verifyWnd = new WindowBarcodeVerify(seqList, currentRound, maxRound, autoScan:false)
                                 {
                                     Owner = this
                                 };
