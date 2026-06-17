@@ -122,8 +122,32 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
         // 数据初始化
         // ══════════════════════════════════════════════
 
+        ///// <summary>
+        ///// 根据 RowCount × ColCount 建立全量孔位列表（列优先，与主框一致）。
+        ///// </summary>
+        //private void BuildHoles(List<string> primerLabels)
+        //{
+        //    _allHoles.Clear();
+        //    int total = _rowCount * _colCount;
+        //    for (int holeIdx = 0; holeIdx < total; holeIdx++)
+        //    {
+        //        int rowIdx = holeIdx % _rowCount;
+        //        int colIdx = holeIdx / _rowCount;
+        //        string holeName = (char)('A' + rowIdx) + (colIdx + 1).ToString();
+
+        //        string primer = (holeIdx < primerLabels.Count) ? primerLabels[holeIdx] : "";
+
+        //        _allHoles.Add(new HoleScanItem
+        //        {
+        //            HoleIndex = holeIdx,
+        //            HoleName = holeName,
+        //            ExpectedPrimerLabel = primer,
+        //            ScanResult = null
+        //        });
+        //    }
+        //}
         /// <summary>
-        /// 根据 RowCount × ColCount 建立全量孔位列表（列优先，与主框一致）。
+        /// 根据 RowCount × ColCount 建立全量孔位列表（行优先：先从左往右，再从上到下）。
         /// </summary>
         private void BuildHoles(List<string> primerLabels)
         {
@@ -131,8 +155,9 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
             int total = _rowCount * _colCount;
             for (int holeIdx = 0; holeIdx < total; holeIdx++)
             {
-                int rowIdx = holeIdx % _rowCount;
-                int colIdx = holeIdx / _rowCount;
+                // 行优先：holeIdx = row * colCount + col
+                int rowIdx = holeIdx / _colCount;      // 行号
+                int colIdx = holeIdx % _colCount;      // 列号
                 string holeName = (char)('A' + rowIdx) + (colIdx + 1).ToString();
 
                 string primer = (holeIdx < primerLabels.Count) ? primerLabels[holeIdx] : "";
@@ -214,12 +239,89 @@ namespace AutoLiquid_GenScript_Single_Handling.Window
                 grid.Children.Add(header);
             }
 
-            // ── 孔位格子（列优先：holeIdx = col * rowCount + row）──
-            for (int c = 0; c < _colCount; c++)
+            //// ── 孔位格子（列优先：holeIdx = col * rowCount + row）──
+            //for (int c = 0; c < _colCount; c++)
+            //{
+            //    for (int r = 0; r < _rowCount; r++)
+            //    {
+            //        int holeIdx = c * _rowCount + r;
+            //        var hole = _allHoles[holeIdx];
+
+            //        // 背景色：有引物 = 白色；无引物 = 浅灰
+            //        var bgColor = hole.NeedScan
+            //            ? Color.FromRgb(255, 255, 255)
+            //            : Color.FromRgb(240, 240, 240);
+
+            //        var border = new Border
+            //        {
+            //            BorderBrush = hole.NeedScan ? Brushes.SteelBlue : Brushes.LightGray,
+            //            BorderThickness = new Thickness(1),
+            //            Margin = new Thickness(2),
+            //            MinWidth = 60,
+            //            MinHeight = 52,
+            //            Background = new SolidColorBrush(bgColor)
+            //        };
+
+            //        var panel = new StackPanel
+            //        {
+            //            VerticalAlignment = VerticalAlignment.Center,
+            //            HorizontalAlignment = HorizontalAlignment.Center,
+            //            Margin = new Thickness(3, 2, 3, 2)
+            //        };
+
+            //        // 孔位名（如 A1）
+            //        panel.Children.Add(new TextBlock
+            //        {
+            //            Text = hole.HoleName,
+            //            FontSize = 10,
+            //            FontWeight = FontWeights.Bold,
+            //            Foreground = Brushes.DarkSlateGray,
+            //            HorizontalAlignment = HorizontalAlignment.Center
+            //        });
+
+            //        if (hole.NeedScan)
+            //        {
+            //            // 引物名称（期望扫码内容）
+            //            panel.Children.Add(new TextBlock
+            //            {
+            //                Text = hole.ExpectedPrimerLabel,
+            //                FontSize = 9,
+            //                Foreground = Brushes.DarkBlue,
+            //                HorizontalAlignment = HorizontalAlignment.Center,
+            //                TextWrapping = TextWrapping.Wrap,
+            //                TextAlignment = TextAlignment.Center,
+            //                MaxWidth = 72
+            //            });
+
+            //            // 扫码状态（等待扫码 / ✔ / ✘）
+            //            var statusText = new TextBlock
+            //            {
+            //                Text = (string)Application.Current.FindResource("BarcodeVerifyWaiting"),
+            //                FontSize = 9,
+            //                Foreground = Brushes.Gray,
+            //                HorizontalAlignment = HorizontalAlignment.Center,
+            //                TextWrapping = TextWrapping.Wrap,
+            //                TextAlignment = TextAlignment.Center,
+            //                MaxWidth = 72
+            //            };
+            //            panel.Children.Add(statusText);
+            //            _holeStatusTexts[holeIdx] = statusText;
+            //        }
+
+            //        border.Child = panel;
+            //        Grid.SetRow(border, r + 1);     // +1 跳过表头行
+            //        Grid.SetColumn(border, c + 1);  // +1 跳过行字母列
+            //        grid.Children.Add(border);
+
+            //        _holeBorders[holeIdx] = border;
+            //    }
+            //}
+            // ── 孔位格子（行优先：holeIdx = row * colCount + col，先从左往右，再从上到下）──
+            for (int r = 0; r < _rowCount; r++)
             {
-                for (int r = 0; r < _rowCount; r++)
+                for (int c = 0; c < _colCount; c++)
                 {
-                    int holeIdx = c * _rowCount + r;
+                    int holeIdx = r * _colCount + c;      // 改为行优先计算
                     var hole = _allHoles[holeIdx];
 
                     // 背景色：有引物 = 白色；无引物 = 浅灰
